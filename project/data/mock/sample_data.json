@@ -1,1 +1,16 @@
-﻿[]
+﻿[
+	{
+		"task_id": "task_demo_001",
+		"source_path": "samples/demo_song.mp3",
+		"mode": "normal",
+		"status": "done",
+		"progress": 100
+	},
+	{
+		"task_id": "task_demo_002",
+		"source_path": "samples/demo_song.wav",
+		"mode": "pop",
+		"status": "running",
+		"progress": 45
+	}
+]

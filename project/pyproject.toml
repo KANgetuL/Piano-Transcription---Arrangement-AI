@@ -1,5 +1,14 @@
 [project]
 name = "project"
 version = "0.1.0"
-description = ""
+description = "PianoTrans AI minimal scaffold"
 requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+	"pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
