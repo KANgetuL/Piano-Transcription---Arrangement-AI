@@ -1,0 +1,4 @@
+mode=normal
+C4 quarter
+E4 quarter
+G4 half
