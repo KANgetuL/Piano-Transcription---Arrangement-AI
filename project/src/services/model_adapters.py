@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 from pathlib import Path
 
 from src.config.settings import ModelAdapterSettings
@@ -25,6 +26,18 @@ class SeparationAdapter:
                 sample_rate=sample_rate,
             )
         ]
+
+    def runtime_check(self) -> tuple[bool, str]:
+        """Check Demucs import and expected entrypoint availability."""
+
+        try:
+            pretrained = importlib.import_module("demucs.pretrained")
+        except Exception as exc:
+            return False, f"demucs import failed: {exc}"
+
+        if not hasattr(pretrained, "get_model"):
+            return False, "demucs.pretrained.get_model not found"
+        return True, "demucs runtime entrypoint available"
 
     @classmethod
     def from_settings(cls, settings: ModelAdapterSettings) -> "SeparationAdapter":
@@ -75,6 +88,26 @@ class PitchAdapter:
             ),
         ]
 
+    def runtime_check(self) -> tuple[bool, str]:
+        """Check CREPE and Basic Pitch import/call entrypoints."""
+
+        try:
+            crepe = importlib.import_module("crepe")
+        except Exception as exc:
+            return False, f"crepe import failed: {exc}"
+
+        if not hasattr(crepe, "predict"):
+            return False, "crepe.predict not found"
+
+        try:
+            inference = importlib.import_module("basic_pitch.inference")
+        except Exception as exc:
+            return False, f"basic_pitch.inference import failed: {exc}"
+
+        if not hasattr(inference, "predict"):
+            return False, "basic_pitch.inference.predict not found"
+        return True, "pitch runtime entrypoints available"
+
     @classmethod
     def from_settings(cls, settings: ModelAdapterSettings) -> "PitchAdapter":
         return cls(
@@ -95,6 +128,18 @@ class HarmonyAdapter:
         if not segments:
             return []
         return [ChordEvent(symbol="C:maj", start_sec=segments[0].start_sec, end_sec=segments[0].end_sec)]
+
+    def runtime_check(self) -> tuple[bool, str]:
+        """Check Basic Pitch note-creation entrypoint for harmony support stage."""
+
+        try:
+            note_creation = importlib.import_module("basic_pitch.note_creation")
+        except Exception as exc:
+            return False, f"basic_pitch.note_creation import failed: {exc}"
+
+        if not hasattr(note_creation, "model_output_to_notes"):
+            return False, "basic_pitch.note_creation.model_output_to_notes not found"
+        return True, "harmony runtime entrypoint available"
 
     @classmethod
     def from_settings(cls, settings: ModelAdapterSettings) -> "HarmonyAdapter":

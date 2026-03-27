@@ -78,3 +78,22 @@
 - 结果标记: TODO（受 Python 3.14 兼容性限制）。
 - 错误类型:
 	- crepe/basic-pitch 依赖兼容性限制。
+
+## 对话关键节点（2026-03-27 - 兼容 Python 版本任务）
+- 任务启动时间: 2026-03-27。
+- 核心操作动作:
+	- 在 python-version-test 分支创建 project/.conda311（Python 3.11）。
+	- 在兼容环境安装 demucs/crepe/basic-pitch 并验证 runtime probe。
+	- 执行 pytest 并清理临时测试文件。
+- 结果标记: DONE。
+- 错误类型: 无新增执行错误。
+
+## 对话关键节点（2026-03-27 - 模型可调用 Demo 任务）
+- 任务启动时间: 2026-03-27。
+- 核心操作动作:
+	- 评估 Python 3.14 与 3.11 可靠性差异，并完成分支合并风险检查。
+	- 新增运行时可调用性诊断链路（runtime_check + runtime_demo_service + CLI --runtime-demo）。
+	- 执行 pytest，按规范创建并删除临时测试文件。
+- 结果标记: DONE。
+- 错误类型:
+	- 测试构造参数与 RuntimeProbeResult 字段不匹配（已修复）。

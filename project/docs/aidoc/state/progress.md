@@ -36,7 +36,8 @@
 - DONE: 新增真实模型适配层占位接口并补齐集成测试模板。
 - DONE: 完成真实模型接线占位参数化并通过测试。
 - DONE: 完成模型 SDK 包探测与软失败降级接线。
-- TODO: 完整安装 crepe/basic-pitch（需切换 Python 3.11/3.12 环境）。
+- DONE: 完整安装 crepe/basic-pitch（已在 project/.conda311 Python 3.11 环境完成）。
+- DONE: 完成模型可调用 Demo（CLI --runtime-demo + 分阶段可调用性诊断）。
 
 ## 风险与缓解
 - 风险: 模型推理耗时过高。
