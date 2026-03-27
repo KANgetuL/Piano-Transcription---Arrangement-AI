@@ -1,35 +1,43 @@
 from __future__ import annotations
 
+import logging
+
 from src.models.entities import (
-    AudioSegment,
-    ChordEvent,
-    NoteEvent,
     TranscriptionRequest,
     TranscriptionResult,
 )
+from src.config.settings import get_settings
+from src.services.model_adapters import HarmonyAdapter, PitchAdapter, SeparationAdapter
+from src.services.runtime_probe_service import RuntimeProbeResult, probe_model_runtime
+
+logger = logging.getLogger(__name__)
 
 
-def transcribe_stub(request: TranscriptionRequest) -> TranscriptionResult:
-    """Temporary protocol-level stub for future model orchestration."""
+def transcribe_with_adapters(
+    request: TranscriptionRequest,
+    separation_adapter: SeparationAdapter | None = None,
+    pitch_adapter: PitchAdapter | None = None,
+    harmony_adapter: HarmonyAdapter | None = None,
+    runtime_probe_result: RuntimeProbeResult | None = None,
+) -> TranscriptionResult:
+    """Run placeholder adapter pipeline to produce structured transcription output."""
 
-    mode_bias = {
-        "normal": 60,
-        "pop": 64,
-        "electronic": 67,
-        "classical": 62,
-        "black": 72,
-    }
-    base_pitch = mode_bias[request.mode]
+    settings = get_settings().model
+    runtime_probe = runtime_probe_result or probe_model_runtime()
+    if settings.strict_model_runtime and not runtime_probe.all_available:
+        missing = ", ".join(runtime_probe.missing_modules)
+        raise RuntimeError(f"[transcription] [runtime_probe] [missing modules in strict mode: {missing}]")
 
-    segments = [
-        AudioSegment(segment_id=f"{request.task_id}_seg_01", start_sec=0.0, end_sec=1.5, sample_rate=request.sample_rate)
-    ]
-    notes = [
-        NoteEvent(pitch_midi=base_pitch, velocity=90, start_sec=0.0, end_sec=0.5, hand="right"),
-        NoteEvent(pitch_midi=base_pitch + 4, velocity=88, start_sec=0.5, end_sec=1.0, hand="right"),
-        NoteEvent(pitch_midi=base_pitch - 12, velocity=84, start_sec=0.0, end_sec=1.0, hand="left"),
-    ]
-    chords = [ChordEvent(symbol="C:maj", start_sec=0.0, end_sec=1.5)]
+    if not runtime_probe.all_available:
+        logger.warning("Runtime probe missing optional model SDKs: %s", runtime_probe.missing_modules)
+
+    separation = separation_adapter or SeparationAdapter.from_settings(settings)
+    pitch = pitch_adapter or PitchAdapter.from_settings(settings)
+    harmony = harmony_adapter or HarmonyAdapter.from_settings(settings)
+
+    segments = separation.separate(source_path=request.source_path, sample_rate=request.sample_rate)
+    notes = pitch.predict_notes(segments=segments, mode=request.mode)
+    chords = harmony.estimate_chords(segments=segments)
 
     return TranscriptionResult(
         task_id=request.task_id,
@@ -42,3 +50,9 @@ def transcribe_stub(request: TranscriptionRequest) -> TranscriptionResult:
         notes=notes,
         chords=chords,
     )
+
+
+def transcribe_stub(request: TranscriptionRequest) -> TranscriptionResult:
+    """Compatibility entrypoint currently backed by adapter orchestration."""
+
+    return transcribe_with_adapters(request=request)

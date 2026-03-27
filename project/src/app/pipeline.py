@@ -8,7 +8,7 @@ from src.config.settings import get_settings
 from src.models.entities import ScoreDocument, TranscriptionMode, TranscriptionRequest, to_score_document
 from src.services.audio_ingestion_service import validate_audio_file
 from src.services.export_service import export_to_text
-from src.services.transcription_service import transcribe_stub
+from src.services.transcription_service import transcribe_with_adapters
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,9 @@ def run_transcription_pipeline(source_path: Path, mode: TranscriptionMode = "nor
         source_path=source_path,
         mode=mode,
         task_id=f"task_{uuid.uuid4().hex[:8]}",
+        sample_rate=settings.model.default_sample_rate,
     )
-    result = transcribe_stub(request=request)
+    result = transcribe_with_adapters(request=request)
     score = to_score_document(result)
     output_path = export_to_text(score=score, output_dir=settings.output_dir)
     logger.info("Pipeline finished. Output: %s", output_path)
