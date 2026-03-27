@@ -19,6 +19,17 @@ class TranscriptionJob:
 
 
 @dataclass(slots=True)
+class AudioFileInfo:
+    """User-facing metadata for uploaded audio files."""
+
+    path: Path
+    filename: str
+    extension: str
+    size_bytes: int
+    duration_sec: float | None
+
+
+@dataclass(slots=True)
 class AudioSegment:
     """Time-sliced chunk description used as model preprocessing output."""
 
