@@ -39,6 +39,7 @@
 - DONE: 完整安装 crepe/basic-pitch（已在 project/.conda311 Python 3.11 环境完成）。
 - DONE: 完成模型可调用 Demo（CLI --runtime-demo + 分阶段可调用性诊断）。
 - DONE: 完成音频上传基础服务能力（文件信息、重命名、删除、批量列表上限）。
+- DONE: 完成 PC 端上传管理 UI 接入（最近文件列表、重命名、删除、选择回填）。
 
 ## 风险与缓解
 - 风险: 模型推理耗时过高。
