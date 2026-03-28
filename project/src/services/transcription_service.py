@@ -8,6 +8,7 @@ from src.models.entities import (
 )
 from src.config.settings import get_settings
 from src.services.model_adapters import HarmonyAdapter, PitchAdapter, SeparationAdapter
+from src.services.arrangement_service import apply_mode_arrangement, mode_tempo
 from src.services.runtime_probe_service import RuntimeProbeResult, probe_model_runtime
 
 logger = logging.getLogger(__name__)
@@ -36,13 +37,14 @@ def transcribe_with_adapters(
     harmony = harmony_adapter or HarmonyAdapter.from_settings(settings)
 
     segments = separation.separate(source_path=request.source_path, sample_rate=request.sample_rate)
-    notes = pitch.predict_notes(segments=segments, mode=request.mode)
-    chords = harmony.estimate_chords(segments=segments)
+    base_notes = pitch.predict_notes(segments=segments, mode=request.mode)
+    base_chords = harmony.estimate_chords(segments=segments)
+    notes, chords = apply_mode_arrangement(request.mode, base_notes, base_chords)
 
     return TranscriptionResult(
         task_id=request.task_id,
         title=request.source_path.stem,
-        tempo_bpm=120,
+        tempo_bpm=mode_tempo(request.mode),
         key_signature="C",
         time_signature="4/4",
         bars=1,
