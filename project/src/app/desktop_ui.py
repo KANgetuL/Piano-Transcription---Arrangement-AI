@@ -44,6 +44,7 @@ class DesktopApp(tk.Tk):
         self.preview_text: tk.Text | None = None
         self.export_format_var = tk.StringVar(value=ui_settings.export_format)
         self.export_dir_var = tk.StringVar(value=ui_settings.export_dir)
+        self.upload_dir_var = tk.StringVar(value=ui_settings.upload_dir)
         self.last_score: ScoreDocument | None = None
 
         self._build_layout()
@@ -152,12 +153,16 @@ class DesktopApp(tk.Tk):
         root.rowconfigure(9, weight=1)
 
     def _pick_file(self) -> None:
+        initial_dir = self.upload_dir_var.get().strip() or "."
         file_path = filedialog.askopenfilename(
             title="选择音频文件",
+            initialdir=initial_dir,
             filetypes=[("Audio files", "*.mp3 *.wav"), ("All files", "*.*")],
         )
         if file_path:
             self.selected_path.set(file_path)
+            self.upload_dir_var.set(str(Path(file_path).parent))
+            self._save_ui_settings()
             self._refresh_uploads()
 
     def _refresh_uploads(self) -> None:
@@ -369,6 +374,7 @@ class DesktopApp(tk.Tk):
         settings = UiSettings(
             export_format=self.export_format_var.get().strip().lower() or "txt",
             export_dir=self.export_dir_var.get().strip() or "./outputs",
+            upload_dir=self.upload_dir_var.get().strip() or ".",
         )
         try:
             save_ui_settings(self.ui_settings_file, settings)

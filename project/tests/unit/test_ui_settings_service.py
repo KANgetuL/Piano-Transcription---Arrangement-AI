@@ -10,23 +10,29 @@ def test_load_ui_settings_returns_defaults_when_missing(tmp_path: Path) -> None:
 
     assert settings.export_format == "txt"
     assert settings.export_dir == "./outputs"
+    assert settings.upload_dir == "."
 
 
 def test_save_and_load_ui_settings_roundtrip(tmp_path: Path) -> None:
     settings_file = tmp_path / "ui_settings.json"
-    save_ui_settings(settings_file, UiSettings(export_format="musicxml", export_dir="./custom_outputs"))
+    save_ui_settings(
+        settings_file,
+        UiSettings(export_format="musicxml", export_dir="./custom_outputs", upload_dir="./audio"),
+    )
 
     settings = load_ui_settings(settings_file)
 
     assert settings.export_format == "musicxml"
     assert settings.export_dir == "./custom_outputs"
+    assert settings.upload_dir == "./audio"
 
 
 def test_load_ui_settings_normalizes_invalid_values(tmp_path: Path) -> None:
     settings_file = tmp_path / "ui_settings.json"
-    settings_file.write_text('{"export_format":"PDF","export_dir":""}', encoding="utf-8")
+    settings_file.write_text('{"export_format":"PDF","export_dir":"","upload_dir":""}', encoding="utf-8")
 
     settings = load_ui_settings(settings_file)
 
     assert settings.export_format == "txt"
     assert settings.export_dir == "./outputs"
+    assert settings.upload_dir == "."

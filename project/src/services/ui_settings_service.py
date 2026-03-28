@@ -9,6 +9,7 @@ from pathlib import Path
 class UiSettings:
     export_format: str = "txt"
     export_dir: str = "./outputs"
+    upload_dir: str = "."
 
 
 def load_ui_settings(settings_file: Path) -> UiSettings:
@@ -28,7 +29,11 @@ def load_ui_settings(settings_file: Path) -> UiSettings:
     if not export_dir:
         export_dir = "./outputs"
 
-    return UiSettings(export_format=export_format, export_dir=export_dir)
+    upload_dir = str(payload.get("upload_dir", ".")).strip()
+    if not upload_dir:
+        upload_dir = "."
+
+    return UiSettings(export_format=export_format, export_dir=export_dir, upload_dir=upload_dir)
 
 
 def save_ui_settings(settings_file: Path, settings: UiSettings) -> None:
