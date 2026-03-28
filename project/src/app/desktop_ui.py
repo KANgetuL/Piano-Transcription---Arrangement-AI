@@ -8,9 +8,12 @@ from queue import Empty, SimpleQueue
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
+from src.config.settings import get_settings
+from src.models.entities import ScoreDocument
 from src.services.mode_preference_service import load_last_mode, mode_description, save_last_mode
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
+from src.services.export_service import export_score
 from src.services.score_preview_service import load_score_preview
 from src.services.task_queue_service import TaskQueueService
 from src.utils.logging_utils import configure_logging
@@ -37,6 +40,8 @@ class DesktopApp(tk.Tk):
         self.upload_items: list[AudioFileInfo] = []
         self.progress_updates: SimpleQueue[tuple[int, str, float | None]] = SimpleQueue()
         self.preview_text: tk.Text | None = None
+        self.export_format_var = tk.StringVar(value="txt")
+        self.last_score: ScoreDocument | None = None
 
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -103,13 +108,26 @@ class DesktopApp(tk.Tk):
         self.cancel_btn = ttk.Button(root, text="取消任务", command=self._cancel_task, state=tk.DISABLED)
         self.cancel_btn.grid(row=5, column=2, sticky=tk.E, pady=(4, 0))
 
-        self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
-        self.progress.grid(row=6, column=0, columnspan=3, sticky=tk.EW, pady=(24, 8))
+        export_frame = ttk.Frame(root)
+        export_frame.grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(6, 0))
+        ttk.Label(export_frame, text="导出格式").grid(row=0, column=0, sticky=tk.W)
+        ttk.Combobox(
+            export_frame,
+            textvariable=self.export_format_var,
+            values=["txt", "mid", "musicxml"],
+            state="readonly",
+            width=12,
+        ).grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
+        self.export_btn = ttk.Button(export_frame, text="导出当前乐谱", command=self._export_current_score, state=tk.DISABLED)
+        self.export_btn.grid(row=0, column=2, sticky=tk.W, padx=(12, 0))
 
-        ttk.Label(root, textvariable=self.status_var).grid(row=7, column=0, columnspan=3, sticky=tk.W)
+        self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
+        self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
+
+        ttk.Label(root, textvariable=self.status_var).grid(row=8, column=0, columnspan=3, sticky=tk.W)
 
         preview_frame = ttk.LabelFrame(root, text="乐谱预览（文本）", padding=8)
-        preview_frame.grid(row=8, column=0, columnspan=3, sticky=tk.NSEW, pady=(10, 0))
+        preview_frame.grid(row=9, column=0, columnspan=3, sticky=tk.NSEW, pady=(10, 0))
         self.preview_text = tk.Text(preview_frame, height=8, wrap=tk.WORD)
         self.preview_text.grid(row=0, column=0, sticky=tk.NSEW)
         preview_scroll = ttk.Scrollbar(preview_frame, orient=tk.VERTICAL, command=self.preview_text.yview)
@@ -122,7 +140,7 @@ class DesktopApp(tk.Tk):
 
         root.columnconfigure(0, weight=1)
         root.rowconfigure(3, weight=1)
-        root.rowconfigure(8, weight=1)
+        root.rowconfigure(9, weight=1)
 
     def _pick_file(self) -> None:
         file_path = filedialog.askopenfilename(
@@ -221,6 +239,7 @@ class DesktopApp(tk.Tk):
         self.status_var.set("处理中...")
         self.start_btn.configure(state=tk.DISABLED)
         self.cancel_btn.configure(state=tk.NORMAL)
+        self.export_btn.configure(state=tk.DISABLED)
         self.progress_var.set(0)
         self._set_preview_text("处理中，完成后将加载导出预览。")
 
@@ -269,6 +288,8 @@ class DesktopApp(tk.Tk):
             return
 
         self.status_var.set(f"完成: {result.output_path}")
+        self.last_score = result.score
+        self.export_btn.configure(state=tk.NORMAL)
         try:
             preview = load_score_preview(result.output_path)
         except OSError as exc:
@@ -300,6 +321,21 @@ class DesktopApp(tk.Tk):
             self.progress_var.set(0)
             return
         messagebox.showinfo("提示", "任务已开始执行，当前版本暂不支持中途取消。")
+
+    def _export_current_score(self) -> None:
+        if self.last_score is None:
+            messagebox.showinfo("提示", "当前没有可导出的乐谱。")
+            return
+
+        fmt = self.export_format_var.get().strip()
+        output_dir = get_settings().output_dir
+        try:
+            output_path = export_score(self.last_score, output_dir, fmt=fmt)  # type: ignore[arg-type]
+        except Exception as exc:
+            messagebox.showerror("错误", str(exc))
+            return
+
+        messagebox.showinfo("导出成功", f"已导出: {output_path}")
 
     def _set_preview_text(self, text: str) -> None:
         if self.preview_text is None:
