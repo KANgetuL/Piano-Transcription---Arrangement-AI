@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
 from src.models.entities import ScoreDocument
+from src.services.cache_management_service import clear_cache, get_cache_status
 from src.services.mode_preference_service import load_last_mode, mode_description, save_last_mode
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
@@ -33,6 +34,7 @@ class DesktopApp(tk.Tk):
         self.selected_path = tk.StringVar(value="")
         self.preference_file = Path("./cache/ui_preferences.json")
         self.ui_settings_file = Path("./cache/ui_settings.json")
+        self.transcription_cache_dir = Path("./cache/transcription_cache")
         initial_mode = load_last_mode(self.preference_file)
         ui_settings = load_ui_settings(self.ui_settings_file)
         self.mode_var = tk.StringVar(value=initial_mode)
@@ -45,6 +47,7 @@ class DesktopApp(tk.Tk):
         self.export_format_var = tk.StringVar(value=ui_settings.export_format)
         self.export_dir_var = tk.StringVar(value=ui_settings.export_dir)
         self.upload_dir_var = tk.StringVar(value=ui_settings.upload_dir)
+        self.cache_status_var = tk.StringVar(value="缓存占用: 0 文件 / 0.0 KB")
         self.last_score: ScoreDocument | None = None
 
         self._build_layout()
@@ -131,6 +134,9 @@ class DesktopApp(tk.Tk):
         self.export_btn = ttk.Button(export_frame, text="导出当前乐谱", command=self._export_current_score, state=tk.DISABLED)
         self.export_btn.grid(row=0, column=5, sticky=tk.W, padx=(12, 0))
 
+        ttk.Button(export_frame, text="清理缓存", command=self._clear_cache).grid(row=0, column=6, sticky=tk.W, padx=(12, 0))
+        ttk.Label(export_frame, textvariable=self.cache_status_var).grid(row=0, column=7, sticky=tk.W, padx=(8, 0))
+
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
 
@@ -151,6 +157,7 @@ class DesktopApp(tk.Tk):
         root.columnconfigure(0, weight=1)
         root.rowconfigure(3, weight=1)
         root.rowconfigure(9, weight=1)
+        self._refresh_cache_status()
 
     def _pick_file(self) -> None:
         initial_dir = self.upload_dir_var.get().strip() or "."
@@ -369,6 +376,16 @@ class DesktopApp(tk.Tk):
 
     def _on_export_setting_changed(self, _event: object) -> None:
         self._save_ui_settings()
+
+    def _refresh_cache_status(self) -> None:
+        status = get_cache_status(self.transcription_cache_dir)
+        size_kb = status.total_size_bytes / 1024
+        self.cache_status_var.set(f"缓存占用: {status.file_count} 文件 / {size_kb:.1f} KB")
+
+    def _clear_cache(self) -> None:
+        removed = clear_cache(self.transcription_cache_dir)
+        self._refresh_cache_status()
+        messagebox.showinfo("缓存管理", f"已清理缓存文件: {removed} 个")
 
     def _save_ui_settings(self) -> None:
         settings = UiSettings(
