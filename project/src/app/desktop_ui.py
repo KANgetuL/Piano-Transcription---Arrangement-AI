@@ -11,6 +11,7 @@ from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, r
 from src.services.mode_preference_service import load_last_mode, mode_description, save_last_mode
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
+from src.services.score_preview_service import load_score_preview
 from src.services.task_queue_service import TaskQueueService
 from src.utils.logging_utils import configure_logging
 
@@ -35,6 +36,7 @@ class DesktopApp(tk.Tk):
         self.mode_desc_var = tk.StringVar(value=mode_description(initial_mode))
         self.upload_items: list[AudioFileInfo] = []
         self.progress_updates: SimpleQueue[tuple[int, str, float | None]] = SimpleQueue()
+        self.preview_text: tk.Text | None = None
 
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -106,8 +108,21 @@ class DesktopApp(tk.Tk):
 
         ttk.Label(root, textvariable=self.status_var).grid(row=7, column=0, columnspan=3, sticky=tk.W)
 
+        preview_frame = ttk.LabelFrame(root, text="乐谱预览（文本）", padding=8)
+        preview_frame.grid(row=8, column=0, columnspan=3, sticky=tk.NSEW, pady=(10, 0))
+        self.preview_text = tk.Text(preview_frame, height=8, wrap=tk.WORD)
+        self.preview_text.grid(row=0, column=0, sticky=tk.NSEW)
+        preview_scroll = ttk.Scrollbar(preview_frame, orient=tk.VERTICAL, command=self.preview_text.yview)
+        preview_scroll.grid(row=0, column=1, sticky=tk.NS)
+        self.preview_text.configure(yscrollcommand=preview_scroll.set)
+        self.preview_text.insert("1.0", "处理完成后将显示导出文本内容。")
+        self.preview_text.configure(state=tk.DISABLED)
+        preview_frame.columnconfigure(0, weight=1)
+        preview_frame.rowconfigure(0, weight=1)
+
         root.columnconfigure(0, weight=1)
         root.rowconfigure(3, weight=1)
+        root.rowconfigure(8, weight=1)
 
     def _pick_file(self) -> None:
         file_path = filedialog.askopenfilename(
@@ -207,6 +222,7 @@ class DesktopApp(tk.Tk):
         self.start_btn.configure(state=tk.DISABLED)
         self.cancel_btn.configure(state=tk.NORMAL)
         self.progress_var.set(0)
+        self._set_preview_text("处理中，完成后将加载导出预览。")
 
         def _on_progress(percent: int, stage: str, eta_sec: float | None) -> None:
             self.progress_updates.put((percent, stage, eta_sec))
@@ -253,6 +269,12 @@ class DesktopApp(tk.Tk):
             return
 
         self.status_var.set(f"完成: {result.output_path}")
+        try:
+            preview = load_score_preview(result.output_path)
+        except OSError as exc:
+            self._set_preview_text(f"预览加载失败: {exc}")
+        else:
+            self._set_preview_text(preview)
         messagebox.showinfo("完成", f"导出文件: {result.output_path}")
 
     def _drain_progress_updates(self) -> None:
@@ -278,6 +300,14 @@ class DesktopApp(tk.Tk):
             self.progress_var.set(0)
             return
         messagebox.showinfo("提示", "任务已开始执行，当前版本暂不支持中途取消。")
+
+    def _set_preview_text(self, text: str) -> None:
+        if self.preview_text is None:
+            return
+        self.preview_text.configure(state=tk.NORMAL)
+        self.preview_text.delete("1.0", tk.END)
+        self.preview_text.insert("1.0", text)
+        self.preview_text.configure(state=tk.DISABLED)
 
     def _on_close(self) -> None:
         self.queue_service.shutdown()
