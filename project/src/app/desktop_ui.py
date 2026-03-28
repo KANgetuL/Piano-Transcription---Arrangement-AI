@@ -6,6 +6,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
+from src.services.mode_preference_service import load_last_mode, mode_description, save_last_mode
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
 from src.services.task_queue_service import TaskQueueService
@@ -24,8 +25,11 @@ class DesktopApp(tk.Tk):
         self.queue_service = TaskQueueService(worker_count=1)
         self.current_future: Future | None = None
         self.selected_path = tk.StringVar(value="")
-        self.mode_var = tk.StringVar(value="normal")
+        self.preference_file = Path("./cache/ui_preferences.json")
+        initial_mode = load_last_mode(self.preference_file)
+        self.mode_var = tk.StringVar(value=initial_mode)
         self.status_var = tk.StringVar(value="就绪")
+        self.mode_desc_var = tk.StringVar(value=mode_description(initial_mode))
         self.upload_items: list[AudioFileInfo] = []
 
         self._build_layout()
@@ -82,6 +86,11 @@ class DesktopApp(tk.Tk):
             width=22,
         )
         mode_box.grid(row=5, column=0, sticky=tk.W, pady=(4, 0))
+        mode_box.bind("<<ComboboxSelected>>", self._on_mode_changed)
+
+        ttk.Label(root, textvariable=self.mode_desc_var, foreground="#555555", wraplength=520).grid(
+            row=5, column=2, sticky=tk.W, pady=(4, 0)
+        )
 
         self.start_btn = ttk.Button(root, text="开始处理", command=self._start_task)
         self.start_btn.grid(row=5, column=1, sticky=tk.W, padx=(12, 0), pady=(4, 0))
@@ -195,6 +204,15 @@ class DesktopApp(tk.Tk):
         mode: TranscriptionMode = self.mode_var.get()  # type: ignore[assignment]
         self.current_future = self.queue_service.submit_transcription(Path(source), mode)
         self.after(120, self._poll_future)
+
+    def _on_mode_changed(self, _event: object) -> None:
+        mode: TranscriptionMode = self.mode_var.get()  # type: ignore[assignment]
+        self.mode_desc_var.set(mode_description(mode))
+        try:
+            save_last_mode(self.preference_file, mode)
+        except OSError:
+            # Preference write failures should not block primary flow.
+            pass
 
     def _poll_future(self) -> None:
         if self.current_future is None:
