@@ -8,7 +8,6 @@ from queue import Empty, SimpleQueue
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
-from src.config.settings import get_settings
 from src.models.entities import ScoreDocument
 from src.services.mode_preference_service import load_last_mode, mode_description, save_last_mode
 from src.models.entities import AudioFileInfo
@@ -16,6 +15,7 @@ from src.models.entities import TranscriptionMode
 from src.services.export_service import export_score
 from src.services.score_preview_service import load_score_preview
 from src.services.task_queue_service import TaskQueueService
+from src.services.ui_settings_service import UiSettings, load_ui_settings, save_ui_settings
 from src.utils.logging_utils import configure_logging
 
 
@@ -32,7 +32,9 @@ class DesktopApp(tk.Tk):
         self.current_future: Future | None = None
         self.selected_path = tk.StringVar(value="")
         self.preference_file = Path("./cache/ui_preferences.json")
+        self.ui_settings_file = Path("./cache/ui_settings.json")
         initial_mode = load_last_mode(self.preference_file)
+        ui_settings = load_ui_settings(self.ui_settings_file)
         self.mode_var = tk.StringVar(value=initial_mode)
         self.status_var = tk.StringVar(value="就绪")
         self.progress_var = tk.IntVar(value=0)
@@ -40,7 +42,8 @@ class DesktopApp(tk.Tk):
         self.upload_items: list[AudioFileInfo] = []
         self.progress_updates: SimpleQueue[tuple[int, str, float | None]] = SimpleQueue()
         self.preview_text: tk.Text | None = None
-        self.export_format_var = tk.StringVar(value="txt")
+        self.export_format_var = tk.StringVar(value=ui_settings.export_format)
+        self.export_dir_var = tk.StringVar(value=ui_settings.export_dir)
         self.last_score: ScoreDocument | None = None
 
         self._build_layout()
@@ -111,15 +114,21 @@ class DesktopApp(tk.Tk):
         export_frame = ttk.Frame(root)
         export_frame.grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(6, 0))
         ttk.Label(export_frame, text="导出格式").grid(row=0, column=0, sticky=tk.W)
-        ttk.Combobox(
+        export_format_box = ttk.Combobox(
             export_frame,
             textvariable=self.export_format_var,
             values=["txt", "mid", "musicxml"],
             state="readonly",
             width=12,
-        ).grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
+        )
+        export_format_box.grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
+        export_format_box.bind("<<ComboboxSelected>>", self._on_export_setting_changed)
+
+        ttk.Label(export_frame, text="导出目录").grid(row=0, column=2, sticky=tk.W, padx=(12, 0))
+        ttk.Entry(export_frame, textvariable=self.export_dir_var, width=26).grid(row=0, column=3, sticky=tk.W, padx=(8, 0))
+        ttk.Button(export_frame, text="选择", command=self._pick_export_dir).grid(row=0, column=4, sticky=tk.W, padx=(8, 0))
         self.export_btn = ttk.Button(export_frame, text="导出当前乐谱", command=self._export_current_score, state=tk.DISABLED)
-        self.export_btn.grid(row=0, column=2, sticky=tk.W, padx=(12, 0))
+        self.export_btn.grid(row=0, column=5, sticky=tk.W, padx=(12, 0))
 
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
@@ -328,7 +337,7 @@ class DesktopApp(tk.Tk):
             return
 
         fmt = self.export_format_var.get().strip()
-        output_dir = get_settings().output_dir
+        output_dir = Path(self.export_dir_var.get().strip() or "./outputs")
         try:
             output_path = export_score(self.last_score, output_dir, fmt=fmt)
         except Exception as exc:
@@ -344,6 +353,27 @@ class DesktopApp(tk.Tk):
         self.preview_text.delete("1.0", tk.END)
         self.preview_text.insert("1.0", text)
         self.preview_text.configure(state=tk.DISABLED)
+
+    def _pick_export_dir(self) -> None:
+        current = self.export_dir_var.get().strip() or "."
+        selected = filedialog.askdirectory(title="选择导出目录", initialdir=current)
+        if not selected:
+            return
+        self.export_dir_var.set(selected)
+        self._save_ui_settings()
+
+    def _on_export_setting_changed(self, _event: object) -> None:
+        self._save_ui_settings()
+
+    def _save_ui_settings(self) -> None:
+        settings = UiSettings(
+            export_format=self.export_format_var.get().strip().lower() or "txt",
+            export_dir=self.export_dir_var.get().strip() or "./outputs",
+        )
+        try:
+            save_ui_settings(self.ui_settings_file, settings)
+        except OSError:
+            pass
 
     def _on_close(self) -> None:
         self.queue_service.shutdown()
