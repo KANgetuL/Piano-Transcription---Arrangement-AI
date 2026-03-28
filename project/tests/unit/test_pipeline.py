@@ -27,3 +27,22 @@ def test_run_pipeline_rejects_unsupported_file(tmp_path: Path) -> None:
         assert False, "Expected ValueError for unsupported extension"
     except ValueError as exc:
         assert "unsupported extension" in str(exc)
+
+
+def test_run_pipeline_reports_progress_updates(tmp_path: Path, monkeypatch) -> None:
+    input_file = tmp_path / "progress.mp3"
+    input_file.write_bytes(b"fake audio bytes")
+    monkeypatch.chdir(tmp_path)
+
+    updates: list[tuple[int, str]] = []
+
+    run_transcription_pipeline(
+        source_path=input_file,
+        mode="normal",
+        progress_callback=lambda percent, stage: updates.append((percent, stage)),
+    )
+
+    assert updates
+    assert updates[0][0] == 5
+    assert updates[-1] == (100, "处理完成")
+    assert updates == sorted(updates, key=lambda item: item[0])

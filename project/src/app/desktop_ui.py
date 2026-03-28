@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from concurrent.futures import Future
 from pathlib import Path
+from queue import Empty, SimpleQueue
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
@@ -29,8 +30,10 @@ class DesktopApp(tk.Tk):
         initial_mode = load_last_mode(self.preference_file)
         self.mode_var = tk.StringVar(value=initial_mode)
         self.status_var = tk.StringVar(value="就绪")
+        self.progress_var = tk.IntVar(value=0)
         self.mode_desc_var = tk.StringVar(value=mode_description(initial_mode))
         self.upload_items: list[AudioFileInfo] = []
+        self.progress_updates: SimpleQueue[tuple[int, str]] = SimpleQueue()
 
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -95,7 +98,7 @@ class DesktopApp(tk.Tk):
         self.start_btn = ttk.Button(root, text="开始处理", command=self._start_task)
         self.start_btn.grid(row=5, column=1, sticky=tk.W, padx=(12, 0), pady=(4, 0))
 
-        self.progress = ttk.Progressbar(root, mode="indeterminate")
+        self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=6, column=0, columnspan=3, sticky=tk.EW, pady=(24, 8))
 
         ttk.Label(root, textvariable=self.status_var).grid(row=7, column=0, columnspan=3, sticky=tk.W)
@@ -199,10 +202,17 @@ class DesktopApp(tk.Tk):
 
         self.status_var.set("处理中...")
         self.start_btn.configure(state=tk.DISABLED)
-        self.progress.start(10)
+        self.progress_var.set(0)
+
+        def _on_progress(percent: int, stage: str) -> None:
+            self.progress_updates.put((percent, stage))
 
         mode: TranscriptionMode = self.mode_var.get()  # type: ignore[assignment]
-        self.current_future = self.queue_service.submit_transcription(Path(source), mode)
+        self.current_future = self.queue_service.submit_transcription(
+            Path(source),
+            mode,
+            progress_callback=_on_progress,
+        )
         self.after(120, self._poll_future)
 
     def _on_mode_changed(self, _event: object) -> None:
@@ -218,11 +228,13 @@ class DesktopApp(tk.Tk):
         if self.current_future is None:
             return
 
+        self._drain_progress_updates()
+
         if not self.current_future.done():
             self.after(120, self._poll_future)
             return
 
-        self.progress.stop()
+        self.progress_var.set(100)
         self.start_btn.configure(state=tk.NORMAL)
 
         try:
@@ -234,6 +246,15 @@ class DesktopApp(tk.Tk):
 
         self.status_var.set(f"完成: {result.output_path}")
         messagebox.showinfo("完成", f"导出文件: {result.output_path}")
+
+    def _drain_progress_updates(self) -> None:
+        while True:
+            try:
+                percent, stage = self.progress_updates.get_nowait()
+            except Empty:
+                break
+            self.progress_var.set(max(0, min(100, percent)))
+            self.status_var.set(f"{stage} ({percent}%)")
 
     def _on_close(self) -> None:
         self.queue_service.shutdown()

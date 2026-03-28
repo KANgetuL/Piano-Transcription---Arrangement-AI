@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+import inspect
 from pathlib import Path
 from typing import Callable
 
@@ -28,9 +29,14 @@ class TaskQueueService:
         source_path: Path,
         mode: TranscriptionMode = "normal",
         pipeline_runner: Callable[[Path, TranscriptionMode], tuple[ScoreDocument, Path]] = run_transcription_pipeline,
+        progress_callback: Callable[[int, str], None] | None = None,
     ) -> Future[TaskResult]:
         def _run() -> TaskResult:
-            score, output_path = pipeline_runner(source_path, mode)
+            signature = inspect.signature(pipeline_runner)
+            if len(signature.parameters) >= 3:
+                score, output_path = pipeline_runner(source_path, mode, progress_callback)
+            else:
+                score, output_path = pipeline_runner(source_path, mode)
             return TaskResult(score=score, output_path=output_path)
 
         return self._executor.submit(_run)
