@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
 
 from src.models.entities import ScoreDocument
 from src.services.task_queue_service import TaskQueueService
@@ -49,3 +50,27 @@ def test_submit_transcription_forwards_progress_callback(tmp_path: Path) -> None
 
     assert result.output_path.name == "queue_progress.txt"
     assert updates == [(30, "阶段一", 1.2), (100, "完成", None)]
+
+
+def test_cancel_transcription_cancels_queued_future(tmp_path: Path) -> None:
+    queue = TaskQueueService(worker_count=1)
+    first = tmp_path / "first.mp3"
+    second = tmp_path / "second.mp3"
+    first.write_bytes(b"a")
+    second.write_bytes(b"b")
+
+    def _slow_runner(source_path: Path, mode: str):
+        _ = source_path
+        _ = mode
+        time.sleep(0.2)
+        return ScoreDocument(title="slow", notes=["C4"], tempo_bpm=120), tmp_path / "slow.txt"
+
+    first_future = queue.submit_transcription(first, "normal", pipeline_runner=_slow_runner)
+    second_future = queue.submit_transcription(second, "normal", pipeline_runner=_slow_runner)
+    cancelled = queue.cancel_transcription(second_future)
+
+    _ = first_future.result(timeout=3)
+    queue.shutdown()
+
+    assert cancelled is True
+    assert second_future.cancelled()

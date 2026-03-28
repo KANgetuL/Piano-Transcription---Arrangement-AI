@@ -41,5 +41,10 @@ class TaskQueueService:
 
         return self._executor.submit(_run)
 
+    def cancel_transcription(self, future: Future[TaskResult]) -> bool:
+        """Try to cancel a queued transcription task before execution starts."""
+
+        return future.cancel()
+
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=True)

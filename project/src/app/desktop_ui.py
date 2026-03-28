@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from concurrent.futures import CancelledError
 from concurrent.futures import Future
 from pathlib import Path
 from queue import Empty, SimpleQueue
@@ -97,6 +98,8 @@ class DesktopApp(tk.Tk):
 
         self.start_btn = ttk.Button(root, text="开始处理", command=self._start_task)
         self.start_btn.grid(row=5, column=1, sticky=tk.W, padx=(12, 0), pady=(4, 0))
+        self.cancel_btn = ttk.Button(root, text="取消任务", command=self._cancel_task, state=tk.DISABLED)
+        self.cancel_btn.grid(row=5, column=2, sticky=tk.E, pady=(4, 0))
 
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=6, column=0, columnspan=3, sticky=tk.EW, pady=(24, 8))
@@ -202,6 +205,7 @@ class DesktopApp(tk.Tk):
 
         self.status_var.set("处理中...")
         self.start_btn.configure(state=tk.DISABLED)
+        self.cancel_btn.configure(state=tk.NORMAL)
         self.progress_var.set(0)
 
         def _on_progress(percent: int, stage: str, eta_sec: float | None) -> None:
@@ -236,9 +240,13 @@ class DesktopApp(tk.Tk):
 
         self.progress_var.set(100)
         self.start_btn.configure(state=tk.NORMAL)
+        self.cancel_btn.configure(state=tk.DISABLED)
 
         try:
             result = self.current_future.result()
+        except CancelledError:
+            self.status_var.set("任务已取消")
+            return
         except Exception as exc:
             self.status_var.set("处理失败")
             messagebox.showerror("错误", str(exc))
@@ -258,6 +266,18 @@ class DesktopApp(tk.Tk):
                 self.status_var.set(f"{stage} ({percent}%) | 预计剩余 {eta_sec:.1f}s")
             else:
                 self.status_var.set(f"{stage} ({percent}%)")
+
+    def _cancel_task(self) -> None:
+        if self.current_future is None:
+            return
+        cancelled = self.queue_service.cancel_transcription(self.current_future)
+        if cancelled:
+            self.status_var.set("任务已取消")
+            self.cancel_btn.configure(state=tk.DISABLED)
+            self.start_btn.configure(state=tk.NORMAL)
+            self.progress_var.set(0)
+            return
+        messagebox.showinfo("提示", "任务已开始执行，当前版本暂不支持中途取消。")
 
     def _on_close(self) -> None:
         self.queue_service.shutdown()
