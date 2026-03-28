@@ -330,7 +330,7 @@ class DesktopApp(tk.Tk):
         fmt = self.export_format_var.get().strip()
         output_dir = get_settings().output_dir
         try:
-            output_path = export_score(self.last_score, output_dir, fmt=fmt)  # type: ignore[arg-type]
+            output_path = export_score(self.last_score, output_dir, fmt=fmt)
         except Exception as exc:
             messagebox.showerror("错误", str(exc))
             return

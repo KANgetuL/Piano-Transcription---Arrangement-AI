@@ -51,9 +51,12 @@ def export_to_musicxml(score: ScoreDocument, output_dir: Path) -> Path:
     return out_path
 
 
-def export_score(score: ScoreDocument, output_dir: Path, fmt: Literal["txt", "mid", "musicxml"]) -> Path:
-    if fmt == "txt":
+def export_score(score: ScoreDocument, output_dir: Path, fmt: str) -> Path:
+    normalized = fmt.strip().lower()
+    if normalized == "txt":
         return export_to_text(score, output_dir)
-    if fmt == "mid":
+    if normalized == "mid":
         return export_to_midi(score, output_dir)
-    return export_to_musicxml(score, output_dir)
+    if normalized == "musicxml":
+        return export_to_musicxml(score, output_dir)
+    raise ValueError(f"Unsupported export format: {fmt}")

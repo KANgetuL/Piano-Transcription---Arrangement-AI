@@ -38,3 +38,23 @@ def test_export_score_dispatches_by_format(tmp_path: Path) -> None:
     assert out_txt.suffix == ".txt"
     assert out_mid.suffix == ".mid"
     assert out_xml.suffix == ".musicxml"
+
+
+def test_export_score_accepts_case_and_space_variants(tmp_path: Path) -> None:
+    score = ScoreDocument(title="dispatch2", notes=["n1"], tempo_bpm=100)
+
+    out_mid = export_score(score, tmp_path, " MID ")
+    out_xml = export_score(score, tmp_path, "MusicXML")
+
+    assert out_mid.suffix == ".mid"
+    assert out_xml.suffix == ".musicxml"
+
+
+def test_export_score_raises_for_unsupported_format(tmp_path: Path) -> None:
+    score = ScoreDocument(title="dispatch3", notes=["n1"], tempo_bpm=100)
+
+    try:
+        export_score(score, tmp_path, "pdf")
+        assert False, "Expected ValueError"
+    except ValueError as exc:
+        assert "Unsupported export format" in str(exc)
