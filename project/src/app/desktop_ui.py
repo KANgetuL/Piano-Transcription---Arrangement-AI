@@ -33,7 +33,7 @@ class DesktopApp(tk.Tk):
         self.progress_var = tk.IntVar(value=0)
         self.mode_desc_var = tk.StringVar(value=mode_description(initial_mode))
         self.upload_items: list[AudioFileInfo] = []
-        self.progress_updates: SimpleQueue[tuple[int, str]] = SimpleQueue()
+        self.progress_updates: SimpleQueue[tuple[int, str, float | None]] = SimpleQueue()
 
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -204,8 +204,8 @@ class DesktopApp(tk.Tk):
         self.start_btn.configure(state=tk.DISABLED)
         self.progress_var.set(0)
 
-        def _on_progress(percent: int, stage: str) -> None:
-            self.progress_updates.put((percent, stage))
+        def _on_progress(percent: int, stage: str, eta_sec: float | None) -> None:
+            self.progress_updates.put((percent, stage, eta_sec))
 
         mode: TranscriptionMode = self.mode_var.get()  # type: ignore[assignment]
         self.current_future = self.queue_service.submit_transcription(
@@ -250,11 +250,14 @@ class DesktopApp(tk.Tk):
     def _drain_progress_updates(self) -> None:
         while True:
             try:
-                percent, stage = self.progress_updates.get_nowait()
+                percent, stage, eta_sec = self.progress_updates.get_nowait()
             except Empty:
                 break
             self.progress_var.set(max(0, min(100, percent)))
-            self.status_var.set(f"{stage} ({percent}%)")
+            if eta_sec is not None:
+                self.status_var.set(f"{stage} ({percent}%) | 预计剩余 {eta_sec:.1f}s")
+            else:
+                self.status_var.set(f"{stage} ({percent}%)")
 
     def _on_close(self) -> None:
         self.queue_service.shutdown()

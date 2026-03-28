@@ -29,7 +29,7 @@ class TaskQueueService:
         source_path: Path,
         mode: TranscriptionMode = "normal",
         pipeline_runner: Callable[[Path, TranscriptionMode], tuple[ScoreDocument, Path]] = run_transcription_pipeline,
-        progress_callback: Callable[[int, str], None] | None = None,
+        progress_callback: Callable[[int, str, float | None], None] | None = None,
     ) -> Future[TaskResult]:
         def _run() -> TaskResult:
             signature = inspect.signature(pipeline_runner)
