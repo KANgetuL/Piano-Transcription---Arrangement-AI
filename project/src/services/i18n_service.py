@@ -26,6 +26,7 @@ _TEXTS: dict[LanguageCode, dict[str, str]] = {
         "export_current": "导出当前乐谱",
         "clear_cache": "清理缓存",
         "language": "语言",
+        "runtime_mode": "运行模式",
         "preview": "乐谱预览（文本）",
         "preview_placeholder": "处理完成后将显示导出文本内容。",
         "ready": "就绪",
@@ -56,6 +57,8 @@ _TEXTS: dict[LanguageCode, dict[str, str]] = {
         "export_success_message": "已导出: {output_path}",
         "cache_cleared": "已清理缓存文件: {removed} 个",
         "upload_loaded_hint": "当前目录: {upload_dir} | 已加载 {count} 条",
+        "runtime_mode_normal": "normal",
+        "runtime_mode_strict": "strict",
     },
     "en_US": {
         "audio_file": "Audio File",
@@ -74,6 +77,7 @@ _TEXTS: dict[LanguageCode, dict[str, str]] = {
         "export_current": "Export Current Score",
         "clear_cache": "Clear Cache",
         "language": "Language",
+        "runtime_mode": "Runtime Mode",
         "preview": "Score Preview (Text)",
         "preview_placeholder": "The exported text preview will appear after processing.",
         "ready": "Ready",
@@ -104,6 +108,8 @@ _TEXTS: dict[LanguageCode, dict[str, str]] = {
         "export_success_message": "Exported to: {output_path}",
         "cache_cleared": "Cleared cache files: {removed}",
         "upload_loaded_hint": "Current folder: {upload_dir} | Loaded: {count}",
+        "runtime_mode_normal": "normal",
+        "runtime_mode_strict": "strict",
     },
 }
 

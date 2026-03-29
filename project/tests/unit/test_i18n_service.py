@@ -10,6 +10,7 @@ def test_normalize_language_fallbacks_to_zh_cn() -> None:
 def test_ui_text_uses_selected_language() -> None:
     assert ui_text("en_US", "start") == "Start"
     assert ui_text("zh_CN", "start") == "开始处理"
+    assert ui_text("en_US", "runtime_mode") == "Runtime Mode"
 
 
 def test_mode_description_localized_switches_language() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tkinter as tk
 from concurrent.futures import CancelledError
 from concurrent.futures import Future
@@ -49,6 +50,7 @@ class DesktopApp(tk.Tk):
         self.export_format_var = tk.StringVar(value=ui_settings.export_format)
         self.export_dir_var = tk.StringVar(value=ui_settings.export_dir)
         self.upload_dir_var = tk.StringVar(value=ui_settings.upload_dir)
+        self.runtime_mode_var = tk.StringVar(value=ui_settings.runtime_mode)
         self.cache_status_var = tk.StringVar(value="")
         self.last_score: ScoreDocument | None = None
 
@@ -157,6 +159,18 @@ class DesktopApp(tk.Tk):
         )
         self.language_box.grid(row=1, column=1, sticky=tk.W, padx=(8, 0), pady=(6, 0))
         self.language_box.bind("<<ComboboxSelected>>", self._on_language_changed)
+
+        self.runtime_mode_label = ttk.Label(export_frame, text="")
+        self.runtime_mode_label.grid(row=1, column=2, sticky=tk.W, padx=(12, 0), pady=(6, 0))
+        self.runtime_mode_box = ttk.Combobox(
+            export_frame,
+            textvariable=self.runtime_mode_var,
+            values=["normal", "strict"],
+            state="readonly",
+            width=12,
+        )
+        self.runtime_mode_box.grid(row=1, column=3, sticky=tk.W, padx=(8, 0), pady=(6, 0))
+        self.runtime_mode_box.bind("<<ComboboxSelected>>", self._on_runtime_mode_changed)
 
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
@@ -300,6 +314,7 @@ class DesktopApp(tk.Tk):
         self.export_btn.configure(state=tk.DISABLED)
         self.progress_var.set(0)
         self._set_preview_text(ui_text(self.language_var.get(), "preview_loading"))
+        os.environ["PIANOTRANS_STRICT_RUNTIME"] = "1" if self.runtime_mode_var.get() == "strict" else "0"
 
         def _on_progress(percent: int, stage: str, eta_sec: float | None) -> None:
             self.progress_updates.put((percent, stage, eta_sec))
@@ -424,6 +439,9 @@ class DesktopApp(tk.Tk):
         self._apply_language()
         self._save_ui_settings()
 
+    def _on_runtime_mode_changed(self, _event: object) -> None:
+        self._save_ui_settings()
+
     def _refresh_cache_status(self) -> None:
         status = get_cache_status(self.transcription_cache_dir)
         size_kb = status.total_size_bytes / 1024
@@ -466,6 +484,7 @@ class DesktopApp(tk.Tk):
         self.export_btn.configure(text=ui_text(lang, "export_current"))
         self.clear_cache_btn.configure(text=ui_text(lang, "clear_cache"))
         self.language_label.configure(text=ui_text(lang, "language"))
+        self.runtime_mode_label.configure(text=ui_text(lang, "runtime_mode"))
 
         self.preview_frame.configure(text=ui_text(lang, "preview"))
         if self.last_score is None:
@@ -479,6 +498,7 @@ class DesktopApp(tk.Tk):
             export_dir=self.export_dir_var.get().strip() or "./outputs",
             upload_dir=self.upload_dir_var.get().strip() or ".",
             language=self.language_var.get().strip() or "zh_CN",
+            runtime_mode=self.runtime_mode_var.get().strip().lower() or "normal",
         )
         try:
             save_ui_settings(self.ui_settings_file, settings)

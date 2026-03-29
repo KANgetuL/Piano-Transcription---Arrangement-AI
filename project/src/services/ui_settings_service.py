@@ -11,6 +11,7 @@ class UiSettings:
     export_dir: str = "./outputs"
     upload_dir: str = "."
     language: str = "zh_CN"
+    runtime_mode: str = "normal"
 
 
 def load_ui_settings(settings_file: Path) -> UiSettings:
@@ -38,7 +39,17 @@ def load_ui_settings(settings_file: Path) -> UiSettings:
     if language not in {"zh_CN", "en_US"}:
         language = "zh_CN"
 
-    return UiSettings(export_format=export_format, export_dir=export_dir, upload_dir=upload_dir, language=language)
+    runtime_mode = str(payload.get("runtime_mode", "normal")).strip().lower()
+    if runtime_mode not in {"normal", "strict"}:
+        runtime_mode = "normal"
+
+    return UiSettings(
+        export_format=export_format,
+        export_dir=export_dir,
+        upload_dir=upload_dir,
+        language=language,
+        runtime_mode=runtime_mode,
+    )
 
 
 def save_ui_settings(settings_file: Path, settings: UiSettings) -> None:
