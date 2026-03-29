@@ -10,7 +10,8 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
 from src.models.entities import ScoreDocument
 from src.services.cache_management_service import clear_cache, get_cache_status
-from src.services.mode_preference_service import load_last_mode, mode_description, save_last_mode
+from src.services.i18n_service import language_options, mode_description_localized, ui_text
+from src.services.mode_preference_service import load_last_mode, save_last_mode
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
 from src.services.export_service import export_score
@@ -37,17 +38,18 @@ class DesktopApp(tk.Tk):
         self.transcription_cache_dir = Path("./cache/transcription_cache")
         initial_mode = load_last_mode(self.preference_file)
         ui_settings = load_ui_settings(self.ui_settings_file)
+        self.language_var = tk.StringVar(value=ui_settings.language)
         self.mode_var = tk.StringVar(value=initial_mode)
-        self.status_var = tk.StringVar(value="就绪")
+        self.status_var = tk.StringVar(value=ui_text(self.language_var.get(), "ready"))
         self.progress_var = tk.IntVar(value=0)
-        self.mode_desc_var = tk.StringVar(value=mode_description(initial_mode))
+        self.mode_desc_var = tk.StringVar(value=mode_description_localized(initial_mode, self.language_var.get()))
         self.upload_items: list[AudioFileInfo] = []
         self.progress_updates: SimpleQueue[tuple[int, str, float | None]] = SimpleQueue()
         self.preview_text: tk.Text | None = None
         self.export_format_var = tk.StringVar(value=ui_settings.export_format)
         self.export_dir_var = tk.StringVar(value=ui_settings.export_dir)
         self.upload_dir_var = tk.StringVar(value=ui_settings.upload_dir)
-        self.cache_status_var = tk.StringVar(value="缓存占用: 0 文件 / 0.0 KB")
+        self.cache_status_var = tk.StringVar(value="")
         self.last_score: ScoreDocument | None = None
 
         self._build_layout()
@@ -57,25 +59,23 @@ class DesktopApp(tk.Tk):
         root = ttk.Frame(self, padding=16)
         root.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(root, text="音频文件").grid(row=0, column=0, sticky=tk.W)
+        self.audio_label = ttk.Label(root, text="")
+        self.audio_label.grid(row=0, column=0, sticky=tk.W)
         entry = ttk.Entry(root, textvariable=self.selected_path, width=70)
         entry.grid(row=1, column=0, columnspan=3, sticky=tk.EW, pady=(4, 10))
 
-        ttk.Button(root, text="选择文件", command=self._pick_file).grid(row=2, column=0, sticky=tk.W)
+        self.pick_file_btn = ttk.Button(root, text="", command=self._pick_file)
+        self.pick_file_btn.grid(row=2, column=0, sticky=tk.W)
 
-        upload_frame = ttk.LabelFrame(root, text="上传文件列表（最近 5 个）", padding=8)
-        upload_frame.grid(row=3, column=0, columnspan=3, sticky=tk.NSEW, pady=(14, 0))
+        self.upload_frame = ttk.LabelFrame(root, text="", padding=8)
+        self.upload_frame.grid(row=3, column=0, columnspan=3, sticky=tk.NSEW, pady=(14, 0))
 
         self.upload_tree = ttk.Treeview(
-            upload_frame,
+            self.upload_frame,
             columns=("name", "size", "duration", "ext"),
             show="headings",
             height=5,
         )
-        self.upload_tree.heading("name", text="文件名")
-        self.upload_tree.heading("size", text="大小")
-        self.upload_tree.heading("duration", text="时长")
-        self.upload_tree.heading("ext", text="格式")
         self.upload_tree.column("name", width=320, anchor=tk.W)
         self.upload_tree.column("size", width=90, anchor=tk.E)
         self.upload_tree.column("duration", width=90, anchor=tk.E)
@@ -83,19 +83,24 @@ class DesktopApp(tk.Tk):
         self.upload_tree.grid(row=0, column=0, columnspan=4, sticky=tk.NSEW)
         self.upload_tree.bind("<<TreeviewSelect>>", self._on_upload_select)
 
-        ttk.Button(upload_frame, text="刷新", command=self._refresh_uploads).grid(row=1, column=0, sticky=tk.W, pady=(8, 0))
-        ttk.Button(upload_frame, text="重命名", command=self._rename_selected_upload).grid(
+        self.refresh_upload_btn = ttk.Button(self.upload_frame, text="", command=self._refresh_uploads)
+        self.refresh_upload_btn.grid(row=1, column=0, sticky=tk.W, pady=(8, 0))
+        self.rename_upload_btn = ttk.Button(self.upload_frame, text="", command=self._rename_selected_upload)
+        self.rename_upload_btn.grid(
             row=1, column=1, sticky=tk.W, padx=(8, 0), pady=(8, 0)
         )
-        ttk.Button(upload_frame, text="删除", command=self._delete_selected_upload).grid(
+        self.delete_upload_btn = ttk.Button(self.upload_frame, text="", command=self._delete_selected_upload)
+        self.delete_upload_btn.grid(
             row=1, column=2, sticky=tk.W, padx=(8, 0), pady=(8, 0)
         )
-        upload_frame.columnconfigure(0, weight=1)
+        self.upload_frame.columnconfigure(0, weight=1)
 
-        self.upload_hint = tk.StringVar(value="请选择文件后可查看并管理最近上传记录")
-        ttk.Label(upload_frame, textvariable=self.upload_hint).grid(row=1, column=3, sticky=tk.E, padx=(8, 0), pady=(8, 0))
+        self.upload_hint = tk.StringVar(value="")
+        self.upload_hint_label = ttk.Label(self.upload_frame, textvariable=self.upload_hint)
+        self.upload_hint_label.grid(row=1, column=3, sticky=tk.E, padx=(8, 0), pady=(8, 0))
 
-        ttk.Label(root, text="模式").grid(row=4, column=0, sticky=tk.W, pady=(16, 0))
+        self.mode_label = ttk.Label(root, text="")
+        self.mode_label.grid(row=4, column=0, sticky=tk.W, pady=(16, 0))
         mode_box = ttk.Combobox(
             root,
             textvariable=self.mode_var,
@@ -117,7 +122,8 @@ class DesktopApp(tk.Tk):
 
         export_frame = ttk.Frame(root)
         export_frame.grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(6, 0))
-        ttk.Label(export_frame, text="导出格式").grid(row=0, column=0, sticky=tk.W)
+        self.export_format_label = ttk.Label(export_frame, text="")
+        self.export_format_label.grid(row=0, column=0, sticky=tk.W)
         export_format_box = ttk.Combobox(
             export_frame,
             textvariable=self.export_format_var,
@@ -128,41 +134,57 @@ class DesktopApp(tk.Tk):
         export_format_box.grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
         export_format_box.bind("<<ComboboxSelected>>", self._on_export_setting_changed)
 
-        ttk.Label(export_frame, text="导出目录").grid(row=0, column=2, sticky=tk.W, padx=(12, 0))
+        self.export_dir_label = ttk.Label(export_frame, text="")
+        self.export_dir_label.grid(row=0, column=2, sticky=tk.W, padx=(12, 0))
         ttk.Entry(export_frame, textvariable=self.export_dir_var, width=26).grid(row=0, column=3, sticky=tk.W, padx=(8, 0))
-        ttk.Button(export_frame, text="选择", command=self._pick_export_dir).grid(row=0, column=4, sticky=tk.W, padx=(8, 0))
-        self.export_btn = ttk.Button(export_frame, text="导出当前乐谱", command=self._export_current_score, state=tk.DISABLED)
+        self.pick_export_dir_btn = ttk.Button(export_frame, text="", command=self._pick_export_dir)
+        self.pick_export_dir_btn.grid(row=0, column=4, sticky=tk.W, padx=(8, 0))
+        self.export_btn = ttk.Button(export_frame, text="", command=self._export_current_score, state=tk.DISABLED)
         self.export_btn.grid(row=0, column=5, sticky=tk.W, padx=(12, 0))
 
-        ttk.Button(export_frame, text="清理缓存", command=self._clear_cache).grid(row=0, column=6, sticky=tk.W, padx=(12, 0))
+        self.clear_cache_btn = ttk.Button(export_frame, text="", command=self._clear_cache)
+        self.clear_cache_btn.grid(row=0, column=6, sticky=tk.W, padx=(12, 0))
         ttk.Label(export_frame, textvariable=self.cache_status_var).grid(row=0, column=7, sticky=tk.W, padx=(8, 0))
+
+        self.language_label = ttk.Label(export_frame, text="")
+        self.language_label.grid(row=1, column=0, sticky=tk.W, pady=(6, 0))
+        self.language_box = ttk.Combobox(
+            export_frame,
+            textvariable=self.language_var,
+            values=list(language_options()),
+            state="readonly",
+            width=12,
+        )
+        self.language_box.grid(row=1, column=1, sticky=tk.W, padx=(8, 0), pady=(6, 0))
+        self.language_box.bind("<<ComboboxSelected>>", self._on_language_changed)
 
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
 
         ttk.Label(root, textvariable=self.status_var).grid(row=8, column=0, columnspan=3, sticky=tk.W)
 
-        preview_frame = ttk.LabelFrame(root, text="乐谱预览（文本）", padding=8)
-        preview_frame.grid(row=9, column=0, columnspan=3, sticky=tk.NSEW, pady=(10, 0))
-        self.preview_text = tk.Text(preview_frame, height=8, wrap=tk.WORD)
+        self.preview_frame = ttk.LabelFrame(root, text="", padding=8)
+        self.preview_frame.grid(row=9, column=0, columnspan=3, sticky=tk.NSEW, pady=(10, 0))
+        self.preview_text = tk.Text(self.preview_frame, height=8, wrap=tk.WORD)
         self.preview_text.grid(row=0, column=0, sticky=tk.NSEW)
-        preview_scroll = ttk.Scrollbar(preview_frame, orient=tk.VERTICAL, command=self.preview_text.yview)
+        preview_scroll = ttk.Scrollbar(self.preview_frame, orient=tk.VERTICAL, command=self.preview_text.yview)
         preview_scroll.grid(row=0, column=1, sticky=tk.NS)
         self.preview_text.configure(yscrollcommand=preview_scroll.set)
-        self.preview_text.insert("1.0", "处理完成后将显示导出文本内容。")
+        self.preview_text.insert("1.0", "")
         self.preview_text.configure(state=tk.DISABLED)
-        preview_frame.columnconfigure(0, weight=1)
-        preview_frame.rowconfigure(0, weight=1)
+        self.preview_frame.columnconfigure(0, weight=1)
+        self.preview_frame.rowconfigure(0, weight=1)
 
         root.columnconfigure(0, weight=1)
         root.rowconfigure(3, weight=1)
         root.rowconfigure(9, weight=1)
+        self._apply_language()
         self._refresh_cache_status()
 
     def _pick_file(self) -> None:
         initial_dir = self.upload_dir_var.get().strip() or "."
         file_path = filedialog.askopenfilename(
-            title="选择音频文件",
+            title=ui_text(self.language_var.get(), "choose_audio_file"),
             initialdir=initial_dir,
             filetypes=[("Audio files", "*.mp3 *.wav"), ("All files", "*.*")],
         )
@@ -175,14 +197,17 @@ class DesktopApp(tk.Tk):
     def _refresh_uploads(self) -> None:
         source = self.selected_path.get().strip()
         if not source:
-            messagebox.showinfo("提示", "请先选择音频文件后再刷新上传列表。")
+            messagebox.showinfo(
+                ui_text(self.language_var.get(), "prompt"),
+                ui_text(self.language_var.get(), "select_file_before_refresh"),
+            )
             return
 
         upload_dir = Path(source).parent
         try:
             self.upload_items = list_recent_uploads(upload_dir=upload_dir, max_items=5)
         except Exception as exc:
-            messagebox.showerror("错误", str(exc))
+            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
             return
 
         self.upload_tree.delete(*self.upload_tree.get_children())
@@ -191,7 +216,9 @@ class DesktopApp(tk.Tk):
             size_kb = f"{item.size_bytes / 1024:.1f}KB"
             self.upload_tree.insert("", tk.END, iid=str(index), values=(item.filename, size_kb, duration, item.extension))
 
-        self.upload_hint.set(f"当前目录: {upload_dir} | 已加载 {len(self.upload_items)} 条")
+        self.upload_hint.set(
+            ui_text(self.language_var.get(), "upload_loaded_hint").format(upload_dir=upload_dir, count=len(self.upload_items))
+        )
 
     def _selected_upload_item(self) -> AudioFileInfo | None:
         selected = self.upload_tree.selection()
@@ -211,17 +238,21 @@ class DesktopApp(tk.Tk):
     def _rename_selected_upload(self) -> None:
         item = self._selected_upload_item()
         if item is None:
-            messagebox.showinfo("提示", "请先在列表中选择一个文件。")
+            messagebox.showinfo(ui_text(self.language_var.get(), "prompt"), ui_text(self.language_var.get(), "select_upload_first"))
             return
 
-        new_name = simpledialog.askstring("重命名", "输入新文件名（可不带后缀）", initialvalue=item.path.stem)
+        new_name = simpledialog.askstring(
+            ui_text(self.language_var.get(), "rename"),
+            ui_text(self.language_var.get(), "rename_prompt"),
+            initialvalue=item.path.stem,
+        )
         if new_name is None:
             return
 
         try:
             new_path = rename_uploaded_file(item.path, new_name)
         except Exception as exc:
-            messagebox.showerror("错误", str(exc))
+            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
             return
 
         self.selected_path.set(str(new_path))
@@ -230,17 +261,20 @@ class DesktopApp(tk.Tk):
     def _delete_selected_upload(self) -> None:
         item = self._selected_upload_item()
         if item is None:
-            messagebox.showinfo("提示", "请先在列表中选择一个文件。")
+            messagebox.showinfo(ui_text(self.language_var.get(), "prompt"), ui_text(self.language_var.get(), "select_upload_first"))
             return
 
-        confirm = messagebox.askyesno("确认删除", f"确定删除文件: {item.filename} ?")
+        confirm = messagebox.askyesno(
+            ui_text(self.language_var.get(), "confirm_delete"),
+            ui_text(self.language_var.get(), "confirm_delete_message").format(filename=item.filename),
+        )
         if not confirm:
             return
 
         try:
             delete_uploaded_file(item.path)
         except Exception as exc:
-            messagebox.showerror("错误", str(exc))
+            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
             return
 
         if self.selected_path.get().strip() == str(item.path):
@@ -249,20 +283,23 @@ class DesktopApp(tk.Tk):
 
     def _start_task(self) -> None:
         if self.current_future and not self.current_future.done():
-            messagebox.showinfo("提示", "已有任务在运行，请稍候。")
+            messagebox.showinfo(ui_text(self.language_var.get(), "prompt"), ui_text(self.language_var.get(), "task_running_tip"))
             return
 
         source = self.selected_path.get().strip()
         if not source:
-            messagebox.showwarning("提示", "请先选择音频文件。")
+            messagebox.showwarning(
+                ui_text(self.language_var.get(), "warning"),
+                ui_text(self.language_var.get(), "select_file_before_start"),
+            )
             return
 
-        self.status_var.set("处理中...")
+        self.status_var.set(ui_text(self.language_var.get(), "processing"))
         self.start_btn.configure(state=tk.DISABLED)
         self.cancel_btn.configure(state=tk.NORMAL)
         self.export_btn.configure(state=tk.DISABLED)
         self.progress_var.set(0)
-        self._set_preview_text("处理中，完成后将加载导出预览。")
+        self._set_preview_text(ui_text(self.language_var.get(), "preview_loading"))
 
         def _on_progress(percent: int, stage: str, eta_sec: float | None) -> None:
             self.progress_updates.put((percent, stage, eta_sec))
@@ -277,7 +314,7 @@ class DesktopApp(tk.Tk):
 
     def _on_mode_changed(self, _event: object) -> None:
         mode: TranscriptionMode = self.mode_var.get()  # type: ignore[assignment]
-        self.mode_desc_var.set(mode_description(mode))
+        self.mode_desc_var.set(mode_description_localized(mode, self.language_var.get()))
         try:
             save_last_mode(self.preference_file, mode)
         except OSError:
@@ -301,23 +338,26 @@ class DesktopApp(tk.Tk):
         try:
             result = self.current_future.result()
         except CancelledError:
-            self.status_var.set("任务已取消")
+            self.status_var.set(ui_text(self.language_var.get(), "task_cancelled"))
             return
         except Exception as exc:
-            self.status_var.set("处理失败")
-            messagebox.showerror("错误", str(exc))
+            self.status_var.set(ui_text(self.language_var.get(), "task_failed"))
+            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
             return
 
-        self.status_var.set(f"完成: {result.output_path}")
+        self.status_var.set(ui_text(self.language_var.get(), "completed").format(output_path=result.output_path))
         self.last_score = result.score
         self.export_btn.configure(state=tk.NORMAL)
         try:
             preview = load_score_preview(result.output_path)
         except OSError as exc:
-            self._set_preview_text(f"预览加载失败: {exc}")
+            self._set_preview_text(ui_text(self.language_var.get(), "preview_load_failed").format(error=exc))
         else:
             self._set_preview_text(preview)
-        messagebox.showinfo("完成", f"导出文件: {result.output_path}")
+        messagebox.showinfo(
+            ui_text(self.language_var.get(), "complete"),
+            ui_text(self.language_var.get(), "complete_message").format(output_path=result.output_path),
+        )
 
     def _drain_progress_updates(self) -> None:
         while True:
@@ -336,16 +376,16 @@ class DesktopApp(tk.Tk):
             return
         cancelled = self.queue_service.cancel_transcription(self.current_future)
         if cancelled:
-            self.status_var.set("任务已取消")
+            self.status_var.set(ui_text(self.language_var.get(), "task_cancelled"))
             self.cancel_btn.configure(state=tk.DISABLED)
             self.start_btn.configure(state=tk.NORMAL)
             self.progress_var.set(0)
             return
-        messagebox.showinfo("提示", "任务已开始执行，当前版本暂不支持中途取消。")
+        messagebox.showinfo(ui_text(self.language_var.get(), "prompt"), ui_text(self.language_var.get(), "cancel_not_supported"))
 
     def _export_current_score(self) -> None:
         if self.last_score is None:
-            messagebox.showinfo("提示", "当前没有可导出的乐谱。")
+            messagebox.showinfo(ui_text(self.language_var.get(), "prompt"), ui_text(self.language_var.get(), "no_score_to_export"))
             return
 
         fmt = self.export_format_var.get().strip()
@@ -353,10 +393,13 @@ class DesktopApp(tk.Tk):
         try:
             output_path = export_score(self.last_score, output_dir, fmt=fmt)
         except Exception as exc:
-            messagebox.showerror("错误", str(exc))
+            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
             return
 
-        messagebox.showinfo("导出成功", f"已导出: {output_path}")
+        messagebox.showinfo(
+            ui_text(self.language_var.get(), "export_success"),
+            ui_text(self.language_var.get(), "export_success_message").format(output_path=output_path),
+        )
 
     def _set_preview_text(self, text: str) -> None:
         if self.preview_text is None:
@@ -368,7 +411,7 @@ class DesktopApp(tk.Tk):
 
     def _pick_export_dir(self) -> None:
         current = self.export_dir_var.get().strip() or "."
-        selected = filedialog.askdirectory(title="选择导出目录", initialdir=current)
+        selected = filedialog.askdirectory(title=ui_text(self.language_var.get(), "export_dir"), initialdir=current)
         if not selected:
             return
         self.export_dir_var.set(selected)
@@ -377,21 +420,65 @@ class DesktopApp(tk.Tk):
     def _on_export_setting_changed(self, _event: object) -> None:
         self._save_ui_settings()
 
+    def _on_language_changed(self, _event: object) -> None:
+        self._apply_language()
+        self._save_ui_settings()
+
     def _refresh_cache_status(self) -> None:
         status = get_cache_status(self.transcription_cache_dir)
         size_kb = status.total_size_bytes / 1024
-        self.cache_status_var.set(f"缓存占用: {status.file_count} 文件 / {size_kb:.1f} KB")
+        self.cache_status_var.set(
+            ui_text(self.language_var.get(), "cache_status").format(count=status.file_count, size_kb=size_kb)
+        )
 
     def _clear_cache(self) -> None:
         removed = clear_cache(self.transcription_cache_dir)
         self._refresh_cache_status()
-        messagebox.showinfo("缓存管理", f"已清理缓存文件: {removed} 个")
+        messagebox.showinfo(
+            ui_text(self.language_var.get(), "cache_management"),
+            ui_text(self.language_var.get(), "cache_cleared").format(removed=removed),
+        )
+
+    def _apply_language(self) -> None:
+        lang = self.language_var.get()
+        self.audio_label.configure(text=ui_text(lang, "audio_file"))
+        self.pick_file_btn.configure(text=ui_text(lang, "choose_file"))
+        self.upload_frame.configure(text=ui_text(lang, "upload_list"))
+        self.upload_tree.heading("name", text="Name" if lang == "en_US" else "文件名")
+        self.upload_tree.heading("size", text="Size" if lang == "en_US" else "大小")
+        self.upload_tree.heading("duration", text="Duration" if lang == "en_US" else "时长")
+        self.upload_tree.heading("ext", text="Type" if lang == "en_US" else "格式")
+        self.refresh_upload_btn.configure(text=ui_text(lang, "refresh"))
+        self.rename_upload_btn.configure(text=ui_text(lang, "rename"))
+        self.delete_upload_btn.configure(text=ui_text(lang, "delete"))
+        if not self.selected_path.get().strip():
+            self.upload_hint.set(ui_text(lang, "upload_hint_default"))
+
+        self.mode_label.configure(text=ui_text(lang, "mode"))
+        mode: TranscriptionMode = self.mode_var.get()  # type: ignore[assignment]
+        self.mode_desc_var.set(mode_description_localized(mode, lang))
+        self.start_btn.configure(text=ui_text(lang, "start"))
+        self.cancel_btn.configure(text=ui_text(lang, "cancel"))
+
+        self.export_format_label.configure(text=ui_text(lang, "export_format"))
+        self.export_dir_label.configure(text=ui_text(lang, "export_dir"))
+        self.pick_export_dir_btn.configure(text=ui_text(lang, "choose"))
+        self.export_btn.configure(text=ui_text(lang, "export_current"))
+        self.clear_cache_btn.configure(text=ui_text(lang, "clear_cache"))
+        self.language_label.configure(text=ui_text(lang, "language"))
+
+        self.preview_frame.configure(text=ui_text(lang, "preview"))
+        if self.last_score is None:
+            self._set_preview_text(ui_text(lang, "preview_placeholder"))
+        if self.current_future is None or self.current_future.done():
+            self.status_var.set(ui_text(lang, "ready"))
 
     def _save_ui_settings(self) -> None:
         settings = UiSettings(
             export_format=self.export_format_var.get().strip().lower() or "txt",
             export_dir=self.export_dir_var.get().strip() or "./outputs",
             upload_dir=self.upload_dir_var.get().strip() or ".",
+            language=self.language_var.get().strip() or "zh_CN",
         )
         try:
             save_ui_settings(self.ui_settings_file, settings)

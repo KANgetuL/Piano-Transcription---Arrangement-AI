@@ -10,6 +10,7 @@ class UiSettings:
     export_format: str = "txt"
     export_dir: str = "./outputs"
     upload_dir: str = "."
+    language: str = "zh_CN"
 
 
 def load_ui_settings(settings_file: Path) -> UiSettings:
@@ -33,7 +34,11 @@ def load_ui_settings(settings_file: Path) -> UiSettings:
     if not upload_dir:
         upload_dir = "."
 
-    return UiSettings(export_format=export_format, export_dir=export_dir, upload_dir=upload_dir)
+    language = str(payload.get("language", "zh_CN")).strip()
+    if language not in {"zh_CN", "en_US"}:
+        language = "zh_CN"
+
+    return UiSettings(export_format=export_format, export_dir=export_dir, upload_dir=upload_dir, language=language)
 
 
 def save_ui_settings(settings_file: Path, settings: UiSettings) -> None:
