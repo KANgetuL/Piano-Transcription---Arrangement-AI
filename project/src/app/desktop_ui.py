@@ -10,9 +10,11 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
 from src.models.entities import ScoreDocument
+from src.config.settings import get_settings
 from src.services.cache_management_service import clear_cache, get_cache_status
 from src.services.i18n_service import language_options, mode_description_localized, ui_text
 from src.services.mode_preference_service import load_last_mode, save_last_mode
+from src.services.offline_runtime_service import OfflineRuntimeStatus, ensure_offline_cache_dirs, inspect_offline_runtime
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
 from src.services.export_service import export_score
@@ -37,6 +39,7 @@ class DesktopApp(tk.Tk):
         self.preference_file = Path("./cache/ui_preferences.json")
         self.ui_settings_file = Path("./cache/ui_settings.json")
         self.transcription_cache_dir = Path("./cache/transcription_cache")
+        self.model_settings = get_settings().model
         initial_mode = load_last_mode(self.preference_file)
         ui_settings = load_ui_settings(self.ui_settings_file)
         self.language_var = tk.StringVar(value=ui_settings.language)
@@ -52,6 +55,7 @@ class DesktopApp(tk.Tk):
         self.upload_dir_var = tk.StringVar(value=ui_settings.upload_dir)
         self.runtime_mode_var = tk.StringVar(value=ui_settings.runtime_mode)
         self.cache_status_var = tk.StringVar(value="")
+        self.offline_status_var = tk.StringVar(value="")
         self.last_score: ScoreDocument | None = None
 
         self._build_layout()
@@ -172,6 +176,10 @@ class DesktopApp(tk.Tk):
         self.runtime_mode_box.grid(row=1, column=3, sticky=tk.W, padx=(8, 0), pady=(6, 0))
         self.runtime_mode_box.bind("<<ComboboxSelected>>", self._on_runtime_mode_changed)
 
+        self.offline_check_btn = ttk.Button(export_frame, text="", command=self._check_offline_runtime)
+        self.offline_check_btn.grid(row=1, column=4, sticky=tk.W, padx=(8, 0), pady=(6, 0))
+        ttk.Label(export_frame, textvariable=self.offline_status_var).grid(row=1, column=5, columnspan=3, sticky=tk.W, padx=(8, 0), pady=(6, 0))
+
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
 
@@ -194,6 +202,7 @@ class DesktopApp(tk.Tk):
         root.rowconfigure(9, weight=1)
         self._apply_language()
         self._refresh_cache_status()
+        self._refresh_offline_status()
 
     def _pick_file(self) -> None:
         initial_dir = self.upload_dir_var.get().strip() or "."
@@ -315,6 +324,15 @@ class DesktopApp(tk.Tk):
         self.progress_var.set(0)
         self._set_preview_text(ui_text(self.language_var.get(), "preview_loading"))
         os.environ["PIANOTRANS_STRICT_RUNTIME"] = "1" if self.runtime_mode_var.get() == "strict" else "0"
+
+        offline_status = ensure_offline_cache_dirs(self.model_settings)
+        self._refresh_offline_status(offline_status)
+        if self.runtime_mode_var.get() == "strict" and not offline_status.all_cached:
+            messagebox.showwarning(ui_text(self.language_var.get(), "warning"), ui_text(self.language_var.get(), "offline_strict_block"))
+            self.status_var.set(ui_text(self.language_var.get(), "ready"))
+            self.start_btn.configure(state=tk.NORMAL)
+            self.cancel_btn.configure(state=tk.DISABLED)
+            return
 
         def _on_progress(percent: int, stage: str, eta_sec: float | None) -> None:
             self.progress_updates.put((percent, stage, eta_sec))
@@ -449,6 +467,29 @@ class DesktopApp(tk.Tk):
             ui_text(self.language_var.get(), "cache_status").format(count=status.file_count, size_kb=size_kb)
         )
 
+    def _refresh_offline_status(self, status: OfflineRuntimeStatus | None = None) -> None:
+        offline_status = status if status is not None else inspect_offline_runtime(self.model_settings)
+        if offline_status.all_cached:
+            self.offline_status_var.set(ui_text(self.language_var.get(), "offline_status_ready"))
+            return
+        missing_count = len(offline_status.missing_models)
+        self.offline_status_var.set(ui_text(self.language_var.get(), "offline_status_missing").format(count=missing_count))
+
+    def _check_offline_runtime(self) -> None:
+        offline_status = inspect_offline_runtime(self.model_settings)
+        self._refresh_offline_status(offline_status)
+        if offline_status.all_cached:
+            messagebox.showinfo(ui_text(self.language_var.get(), "complete"), ui_text(self.language_var.get(), "offline_ready_message"))
+            return
+
+        missing_detail = ", ".join(
+            f"{item.name}: {item.path}" for item in offline_status.items if not item.cached
+        )
+        messagebox.showwarning(
+            ui_text(self.language_var.get(), "warning"),
+            ui_text(self.language_var.get(), "offline_missing_message").format(missing=missing_detail),
+        )
+
     def _clear_cache(self) -> None:
         removed = clear_cache(self.transcription_cache_dir)
         self._refresh_cache_status()
@@ -485,12 +526,14 @@ class DesktopApp(tk.Tk):
         self.clear_cache_btn.configure(text=ui_text(lang, "clear_cache"))
         self.language_label.configure(text=ui_text(lang, "language"))
         self.runtime_mode_label.configure(text=ui_text(lang, "runtime_mode"))
+        self.offline_check_btn.configure(text=ui_text(lang, "offline_check"))
 
         self.preview_frame.configure(text=ui_text(lang, "preview"))
         if self.last_score is None:
             self._set_preview_text(ui_text(lang, "preview_placeholder"))
         if self.current_future is None or self.current_future.done():
             self.status_var.set(ui_text(lang, "ready"))
+        self._refresh_offline_status()
 
     def _save_ui_settings(self) -> None:
         settings = UiSettings(
