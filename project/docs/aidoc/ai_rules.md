@@ -1,5 +1,5 @@
 agent模式下AI必须严格遵守以下规则，并按照顺序完成规则包含的任务：
-0.若以下规则存在冲突，优先级为「错误记录（errors.md）> 工程规范 > 任务执行 > 日志记录」；未明确的场景，AI 需先向用户确认后再执行
+0.若以下规则存在冲突，优先级为「错误记录（errors.md）> 工程规范 > 任务执行 > 日志记录」；未明确的场景，AI 需先向用户确认后再执行。状态检索仅针对当前任务的直接前驱任务，不全局检索非规范状态关键词（如 task_completed应搜索TODO,DONE）
 1.阅读aidoc文件夹下的ai_rules.md（本文件）
 2.阅读ai_context.md，了解AI上下文信息
 3.读取aidoc下的state文件夹中的progress.md。该文件规划了项目进度，并用DONE和TODO区分了是否完成了进度。优先读取 docs/product/PRD.md 和 roadmap.md，再按需读取 ux/engineering 下的核心文档（如 user_flows.md、architecture.md）。注意：读取文档时，仅提取「项目目标、核心功能、当前阶段里程碑、技术栈约束」等关键信息，无需读取文档全文
