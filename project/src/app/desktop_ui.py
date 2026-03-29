@@ -15,6 +15,7 @@ from src.services.cache_management_service import clear_cache, get_cache_status
 from src.services.i18n_service import language_options, mode_description_localized, ui_text
 from src.services.model_update_service import check_model_updates, mark_model_updated
 from src.services.mode_preference_service import load_last_mode, save_last_mode
+from src.services.offline_health_service import get_offline_health_report
 from src.services.offline_runtime_service import OfflineRuntimeStatus, ensure_offline_cache_dirs, inspect_offline_runtime
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
@@ -57,6 +58,7 @@ class DesktopApp(tk.Tk):
         self.runtime_mode_var = tk.StringVar(value=ui_settings.runtime_mode)
         self.cache_status_var = tk.StringVar(value="")
         self.offline_status_var = tk.StringVar(value="")
+        self.offline_health_var = tk.StringVar(value="")
         self.update_status_var = tk.StringVar(value="")
         self.last_score: ScoreDocument | None = None
 
@@ -182,11 +184,15 @@ class DesktopApp(tk.Tk):
         self.offline_check_btn.grid(row=1, column=4, sticky=tk.W, padx=(8, 0), pady=(6, 0))
         ttk.Label(export_frame, textvariable=self.offline_status_var).grid(row=1, column=5, sticky=tk.W, padx=(8, 0), pady=(6, 0))
 
+        self.offline_health_btn = ttk.Button(export_frame, text="", command=self._check_offline_health)
+        self.offline_health_btn.grid(row=1, column=8, sticky=tk.W, padx=(8, 0), pady=(6, 0))
+
         self.update_check_btn = ttk.Button(export_frame, text="", command=self._check_model_updates)
         self.update_check_btn.grid(row=1, column=6, sticky=tk.W, padx=(8, 0), pady=(6, 0))
         self.mark_updated_btn = ttk.Button(export_frame, text="", command=self._mark_model_updated)
         self.mark_updated_btn.grid(row=1, column=7, sticky=tk.W, padx=(8, 0), pady=(6, 0))
-        ttk.Label(export_frame, textvariable=self.update_status_var).grid(row=2, column=0, columnspan=8, sticky=tk.W, pady=(4, 0))
+        ttk.Label(export_frame, textvariable=self.offline_health_var).grid(row=2, column=0, columnspan=9, sticky=tk.W, pady=(4, 0))
+        ttk.Label(export_frame, textvariable=self.update_status_var).grid(row=3, column=0, columnspan=9, sticky=tk.W, pady=(2, 0))
 
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
@@ -211,6 +217,7 @@ class DesktopApp(tk.Tk):
         self._apply_language()
         self._refresh_cache_status()
         self._refresh_offline_status()
+        self._refresh_offline_health_status()
         self._refresh_update_status()
 
     def _pick_file(self) -> None:
@@ -499,6 +506,38 @@ class DesktopApp(tk.Tk):
             ui_text(self.language_var.get(), "offline_missing_message").format(missing=missing_detail),
         )
 
+    def _refresh_offline_health_status(self) -> None:
+        report = get_offline_health_report(self.model_settings)
+        if report.ready_for_offline:
+            self.offline_health_var.set(ui_text(self.language_var.get(), "offline_health_ready"))
+            return
+        pending_count = len(report.missing_models) + len(report.pending_update_models)
+        self.offline_health_var.set(
+            ui_text(self.language_var.get(), "offline_health_not_ready").format(count=pending_count)
+        )
+
+    def _check_offline_health(self) -> None:
+        report = get_offline_health_report(self.model_settings)
+        self._refresh_offline_status(report.runtime_status)
+        self._refresh_update_status()
+        self._refresh_offline_health_status()
+        if report.ready_for_offline:
+            messagebox.showinfo(
+                ui_text(self.language_var.get(), "complete"),
+                ui_text(self.language_var.get(), "offline_health_ready_message"),
+            )
+            return
+
+        details: list[str] = []
+        if report.missing_models:
+            details.append(f"missing_cache={', '.join(report.missing_models)}")
+        if report.pending_update_models:
+            details.append(f"pending_updates={', '.join(report.pending_update_models)}")
+        messagebox.showwarning(
+            ui_text(self.language_var.get(), "warning"),
+            ui_text(self.language_var.get(), "offline_health_not_ready_message").format(details="\n".join(details)),
+        )
+
     def _clear_cache(self) -> None:
         removed = clear_cache(self.transcription_cache_dir)
         self._refresh_cache_status()
@@ -582,6 +621,7 @@ class DesktopApp(tk.Tk):
         self.language_label.configure(text=ui_text(lang, "language"))
         self.runtime_mode_label.configure(text=ui_text(lang, "runtime_mode"))
         self.offline_check_btn.configure(text=ui_text(lang, "offline_check"))
+        self.offline_health_btn.configure(text=ui_text(lang, "offline_health_check"))
         self.update_check_btn.configure(text=ui_text(lang, "update_check"))
         self.mark_updated_btn.configure(text=ui_text(lang, "mark_updated"))
 
@@ -591,6 +631,7 @@ class DesktopApp(tk.Tk):
         if self.current_future is None or self.current_future.done():
             self.status_var.set(ui_text(lang, "ready"))
         self._refresh_offline_status()
+        self._refresh_offline_health_status()
         self._refresh_update_status()
 
     def _save_ui_settings(self) -> None:

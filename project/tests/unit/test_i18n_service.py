@@ -12,6 +12,8 @@ def test_ui_text_uses_selected_language() -> None:
     assert ui_text("zh_CN", "start") == "开始处理"
     assert ui_text("en_US", "runtime_mode") == "Runtime Mode"
     assert ui_text("zh_CN", "offline_check") == "离线检查"
+    assert ui_text("zh_CN", "offline_health_check") == "离线自检"
+    assert ui_text("en_US", "offline_health_check") == "Offline Health"
     assert ui_text("en_US", "update_check") == "Check Updates"
 
 
