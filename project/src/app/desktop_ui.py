@@ -248,19 +248,13 @@ class DesktopApp(tk.Tk):
         self._refresh_uploads()
 
         messagebox.showinfo(
-            ui_text(self.language_var.get(), "prompt"),
-            ui_text(self.language_var.get(), "batch_upload_selected_message").format(count=len(valid_files)),
+            ui_text(self.language_var.get(), "batch_upload_summary_title"),
+            ui_text(self.language_var.get(), "batch_upload_summary_message").format(
+                valid=len(valid_files),
+                invalid=len(skipped_files),
+                truncated=truncated_count,
+            ),
         )
-        if skipped_files:
-            messagebox.showwarning(
-                ui_text(self.language_var.get(), "warning"),
-                ui_text(self.language_var.get(), "batch_upload_invalid_message").format(count=len(skipped_files)),
-            )
-        if truncated_count > 0:
-            messagebox.showwarning(
-                ui_text(self.language_var.get(), "warning"),
-                ui_text(self.language_var.get(), "batch_upload_limit_message").format(count=truncated_count),
-            )
 
     def _refresh_uploads(self) -> None:
         source = self.selected_path.get().strip()

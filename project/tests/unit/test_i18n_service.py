@@ -14,6 +14,8 @@ def test_ui_text_uses_selected_language() -> None:
     assert ui_text("en_US", "export_all") == "Batch Export"
     assert ui_text("zh_CN", "batch_upload_no_valid") == "未选择可用的音频文件。"
     assert "maximum" in ui_text("en_US", "batch_upload_limit_message")
+    assert ui_text("zh_CN", "batch_upload_summary_title") == "批量上传结果"
+    assert "Valid files" in ui_text("en_US", "batch_upload_summary_message")
     assert ui_text("en_US", "runtime_mode") == "Runtime Mode"
     assert ui_text("zh_CN", "offline_check") == "离线检查"
     assert ui_text("zh_CN", "offline_health_check") == "离线自检"
