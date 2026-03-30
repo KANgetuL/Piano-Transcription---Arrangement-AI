@@ -65,6 +65,9 @@ def export_score(score: ScoreDocument, output_dir: Path, fmt: str) -> Path:
 def export_scores(scores: list[ScoreDocument], output_dir: Path, fmt: str) -> list[Path]:
     """Export multiple scores in one call and avoid filename collisions by suffixing titles."""
 
+    if not scores:
+        raise ValueError("scores cannot be empty")
+
     name_counter: dict[str, int] = {}
     outputs: list[Path] = []
     for score in scores:
