@@ -52,3 +52,22 @@ def test_delete_uploaded_file(monkeypatch, tmp_path: Path) -> None:
     upload_workflow.delete_uploaded_file(target)
 
     assert not target.exists()
+
+
+def test_collect_batch_upload_files_filters_invalid_and_deduplicates(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        upload_workflow,
+        "get_settings",
+        lambda: type("S", (), {"supported_audio_extensions": (".mp3", ".wav")})(),
+    )
+    valid = tmp_path / "ok.mp3"
+    valid.write_bytes(b"x")
+    invalid = tmp_path / "bad.flac"
+    invalid.write_bytes(b"y")
+
+    items, skipped = upload_workflow.collect_batch_upload_files((str(valid), str(valid), str(invalid)))
+
+    assert len(items) == 1
+    assert items[0].filename == "ok.mp3"
+    assert len(skipped) == 1
+    assert skipped[0].name == "bad.flac"

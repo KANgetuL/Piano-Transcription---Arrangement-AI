@@ -8,7 +8,7 @@ from pathlib import Path
 from queue import Empty, SimpleQueue
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from src.app.upload_workflow import delete_uploaded_file, list_recent_uploads, rename_uploaded_file
+from src.app.upload_workflow import collect_batch_upload_files, delete_uploaded_file, list_recent_uploads, rename_uploaded_file
 from src.models.entities import ScoreDocument
 from src.config.settings import get_settings
 from src.services.cache_management_service import clear_cache, get_cache_status
@@ -225,16 +225,37 @@ class DesktopApp(tk.Tk):
 
     def _pick_file(self) -> None:
         initial_dir = self.upload_dir_var.get().strip() or "."
-        file_path = filedialog.askopenfilename(
+        file_paths = filedialog.askopenfilenames(
             title=ui_text(self.language_var.get(), "choose_audio_file"),
             initialdir=initial_dir,
             filetypes=[("Audio files", "*.mp3 *.wav"), ("All files", "*.*")],
         )
-        if file_path:
-            self.selected_path.set(file_path)
-            self.upload_dir_var.set(str(Path(file_path).parent))
-            self._save_ui_settings()
-            self._refresh_uploads()
+        if not file_paths:
+            return
+
+        valid_files, skipped_files = collect_batch_upload_files(tuple(file_paths))
+        if not valid_files:
+            messagebox.showwarning(
+                ui_text(self.language_var.get(), "warning"),
+                ui_text(self.language_var.get(), "batch_upload_no_valid"),
+            )
+            return
+
+        first_file = valid_files[0].path
+        self.selected_path.set(str(first_file))
+        self.upload_dir_var.set(str(first_file.parent))
+        self._save_ui_settings()
+        self._refresh_uploads()
+
+        messagebox.showinfo(
+            ui_text(self.language_var.get(), "prompt"),
+            ui_text(self.language_var.get(), "batch_upload_selected_message").format(count=len(valid_files)),
+        )
+        if skipped_files:
+            messagebox.showwarning(
+                ui_text(self.language_var.get(), "warning"),
+                ui_text(self.language_var.get(), "batch_upload_invalid_message").format(count=len(skipped_files)),
+            )
 
     def _refresh_uploads(self) -> None:
         source = self.selected_path.get().strip()

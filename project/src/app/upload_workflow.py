@@ -4,7 +4,7 @@ from pathlib import Path
 
 from src.config.settings import get_settings
 from src.models.entities import AudioFileInfo
-from src.services.audio_ingestion_service import delete_audio_file, list_audio_files, rename_audio_file
+from src.services.audio_ingestion_service import delete_audio_file, get_audio_file_info, list_audio_files, rename_audio_file
 
 
 def list_recent_uploads(upload_dir: Path, max_items: int = 5) -> list[AudioFileInfo]:
@@ -30,3 +30,24 @@ def delete_uploaded_file(path: Path) -> None:
 
     settings = get_settings()
     delete_audio_file(path=path, supported_extensions=settings.supported_audio_extensions)
+
+
+def collect_batch_upload_files(paths: tuple[str, ...]) -> tuple[list[AudioFileInfo], list[Path]]:
+    """Validate selected files for batch upload and return valid infos plus skipped paths."""
+
+    settings = get_settings()
+    valid_files: list[AudioFileInfo] = []
+    skipped_files: list[Path] = []
+    seen: set[Path] = set()
+    for raw_path in paths:
+        path = Path(raw_path)
+        if path in seen:
+            continue
+        seen.add(path)
+        try:
+            valid_files.append(
+                get_audio_file_info(path=path, supported_extensions=settings.supported_audio_extensions)
+            )
+        except (FileNotFoundError, ValueError):
+            skipped_files.append(path)
+    return valid_files, skipped_files
