@@ -21,6 +21,9 @@ def test_ui_text_uses_selected_language() -> None:
     assert ui_text("zh_CN", "offline_health_check") == "离线自检"
     assert ui_text("en_US", "offline_health_check") == "Offline Health"
     assert ui_text("en_US", "update_check") == "Check Updates"
+    assert "悬停" in ui_text("zh_CN", "operation_hint_default")
+    assert "Hover" in ui_text("en_US", "operation_hint_default")
+    assert "batch export" in ui_text("en_US", "hint_export_all").lower()
 
 
 def test_mode_description_localized_switches_language() -> None:

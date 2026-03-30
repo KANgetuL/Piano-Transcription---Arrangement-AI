@@ -60,6 +60,7 @@ class DesktopApp(tk.Tk):
         self.offline_status_var = tk.StringVar(value="")
         self.offline_health_var = tk.StringVar(value="")
         self.update_status_var = tk.StringVar(value="")
+        self.action_hint_var = tk.StringVar(value="")
         self.last_score: ScoreDocument | None = None
         self.processed_scores: list[ScoreDocument] = []
 
@@ -200,7 +201,8 @@ class DesktopApp(tk.Tk):
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100, variable=self.progress_var)
         self.progress.grid(row=7, column=0, columnspan=3, sticky=tk.EW, pady=(16, 8))
 
-        ttk.Label(root, textvariable=self.status_var).grid(row=8, column=0, columnspan=3, sticky=tk.W)
+        ttk.Label(root, textvariable=self.status_var).grid(row=8, column=0, columnspan=2, sticky=tk.W)
+        ttk.Label(root, textvariable=self.action_hint_var, foreground="#555555").grid(row=8, column=2, sticky=tk.E)
 
         self.preview_frame = ttk.LabelFrame(root, text="", padding=8)
         self.preview_frame.grid(row=9, column=0, columnspan=3, sticky=tk.NSEW, pady=(10, 0))
@@ -217,11 +219,34 @@ class DesktopApp(tk.Tk):
         root.columnconfigure(0, weight=1)
         root.rowconfigure(3, weight=1)
         root.rowconfigure(9, weight=1)
+        self._bind_action_hints()
         self._apply_language()
         self._refresh_cache_status()
         self._refresh_offline_status()
         self._refresh_offline_health_status()
         self._refresh_update_status()
+
+    def _bind_action_hints(self) -> None:
+        hint_bindings: tuple[tuple[ttk.Button, str], ...] = (
+            (self.pick_file_btn, "hint_choose_file"),
+            (self.refresh_upload_btn, "hint_refresh_uploads"),
+            (self.rename_upload_btn, "hint_rename_upload"),
+            (self.delete_upload_btn, "hint_delete_upload"),
+            (self.start_btn, "hint_start_processing"),
+            (self.cancel_btn, "hint_cancel_task"),
+            (self.export_btn, "hint_export_current"),
+            (self.batch_export_btn, "hint_export_all"),
+            (self.offline_check_btn, "hint_offline_check"),
+        )
+        for widget, key in hint_bindings:
+            widget.bind("<Enter>", lambda _event, hint_key=key: self._set_action_hint(hint_key), add="+")
+            widget.bind("<Leave>", lambda _event: self._clear_action_hint(), add="+")
+
+    def _set_action_hint(self, hint_key: str) -> None:
+        self.action_hint_var.set(ui_text(self.language_var.get(), hint_key))
+
+    def _clear_action_hint(self) -> None:
+        self.action_hint_var.set(ui_text(self.language_var.get(), "operation_hint_default"))
 
     def _pick_file(self) -> None:
         initial_dir = self.upload_dir_var.get().strip() or "."
@@ -675,6 +700,7 @@ class DesktopApp(tk.Tk):
         self.preview_frame.configure(text=ui_text(lang, "preview"))
         if self.last_score is None:
             self._set_preview_text(ui_text(lang, "preview_placeholder"))
+        self._clear_action_hint()
         if self.current_future is None or self.current_future.done():
             self.status_var.set(ui_text(lang, "ready"))
         self._refresh_offline_status()
