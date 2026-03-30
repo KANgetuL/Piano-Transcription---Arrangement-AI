@@ -10,6 +10,8 @@ def test_normalize_language_fallbacks_to_zh_cn() -> None:
 def test_ui_text_uses_selected_language() -> None:
     assert ui_text("en_US", "start") == "Start"
     assert ui_text("zh_CN", "start") == "开始处理"
+    assert ui_text("zh_CN", "export_all") == "批量导出"
+    assert ui_text("en_US", "export_all") == "Batch Export"
     assert ui_text("en_US", "runtime_mode") == "Runtime Mode"
     assert ui_text("zh_CN", "offline_check") == "离线检查"
     assert ui_text("zh_CN", "offline_health_check") == "离线自检"

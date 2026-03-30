@@ -60,3 +60,22 @@ def export_score(score: ScoreDocument, output_dir: Path, fmt: str) -> Path:
     if normalized == "musicxml":
         return export_to_musicxml(score, output_dir)
     raise ValueError(f"Unsupported export format: {fmt}")
+
+
+def export_scores(scores: list[ScoreDocument], output_dir: Path, fmt: str) -> list[Path]:
+    """Export multiple scores in one call and avoid filename collisions by suffixing titles."""
+
+    name_counter: dict[str, int] = {}
+    outputs: list[Path] = []
+    for score in scores:
+        base_title = score.title
+        index = name_counter.get(base_title, 0)
+        name_counter[base_title] = index + 1
+        export_title = base_title if index == 0 else f"{base_title}_{index + 1}"
+        normalized_score = ScoreDocument(
+            title=export_title,
+            notes=list(score.notes),
+            tempo_bpm=score.tempo_bpm,
+        )
+        outputs.append(export_score(normalized_score, output_dir, fmt=fmt))
+    return outputs

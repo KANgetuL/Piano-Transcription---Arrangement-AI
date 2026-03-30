@@ -19,7 +19,7 @@ from src.services.offline_health_service import get_offline_health_report
 from src.services.offline_runtime_service import OfflineRuntimeStatus, ensure_offline_cache_dirs, inspect_offline_runtime
 from src.models.entities import AudioFileInfo
 from src.models.entities import TranscriptionMode
-from src.services.export_service import export_score
+from src.services.export_service import export_score, export_scores
 from src.services.score_preview_service import load_score_preview
 from src.services.task_queue_service import TaskQueueService
 from src.services.ui_settings_service import UiSettings, load_ui_settings, save_ui_settings
@@ -61,6 +61,7 @@ class DesktopApp(tk.Tk):
         self.offline_health_var = tk.StringVar(value="")
         self.update_status_var = tk.StringVar(value="")
         self.last_score: ScoreDocument | None = None
+        self.processed_scores: list[ScoreDocument] = []
 
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -151,10 +152,12 @@ class DesktopApp(tk.Tk):
         self.pick_export_dir_btn.grid(row=0, column=4, sticky=tk.W, padx=(8, 0))
         self.export_btn = ttk.Button(export_frame, text="", command=self._export_current_score, state=tk.DISABLED)
         self.export_btn.grid(row=0, column=5, sticky=tk.W, padx=(12, 0))
+        self.batch_export_btn = ttk.Button(export_frame, text="", command=self._export_all_scores, state=tk.DISABLED)
+        self.batch_export_btn.grid(row=0, column=6, sticky=tk.W, padx=(8, 0))
 
         self.clear_cache_btn = ttk.Button(export_frame, text="", command=self._clear_cache)
-        self.clear_cache_btn.grid(row=0, column=6, sticky=tk.W, padx=(12, 0))
-        ttk.Label(export_frame, textvariable=self.cache_status_var).grid(row=0, column=7, sticky=tk.W, padx=(8, 0))
+        self.clear_cache_btn.grid(row=0, column=7, sticky=tk.W, padx=(12, 0))
+        ttk.Label(export_frame, textvariable=self.cache_status_var).grid(row=0, column=8, sticky=tk.W, padx=(8, 0))
 
         self.language_label = ttk.Label(export_frame, text="")
         self.language_label.grid(row=1, column=0, sticky=tk.W, pady=(6, 0))
@@ -396,7 +399,9 @@ class DesktopApp(tk.Tk):
 
         self.status_var.set(ui_text(self.language_var.get(), "completed").format(output_path=result.output_path))
         self.last_score = result.score
+        self.processed_scores.append(result.score)
         self.export_btn.configure(state=tk.NORMAL)
+        self.batch_export_btn.configure(state=tk.NORMAL)
         try:
             preview = load_score_preview(result.output_path)
         except OSError as exc:
@@ -448,6 +453,27 @@ class DesktopApp(tk.Tk):
         messagebox.showinfo(
             ui_text(self.language_var.get(), "export_success"),
             ui_text(self.language_var.get(), "export_success_message").format(output_path=output_path),
+        )
+
+    def _export_all_scores(self) -> None:
+        if not self.processed_scores:
+            messagebox.showinfo(ui_text(self.language_var.get(), "prompt"), ui_text(self.language_var.get(), "no_score_to_export"))
+            return
+
+        fmt = self.export_format_var.get().strip()
+        output_dir = Path(self.export_dir_var.get().strip() or "./outputs")
+        try:
+            exported_paths = export_scores(self.processed_scores, output_dir, fmt=fmt)
+        except Exception as exc:
+            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
+            return
+
+        messagebox.showinfo(
+            ui_text(self.language_var.get(), "export_success"),
+            ui_text(self.language_var.get(), "batch_export_success_message").format(
+                count=len(exported_paths),
+                output_dir=output_dir,
+            ),
         )
 
     def _set_preview_text(self, text: str) -> None:
@@ -617,6 +643,7 @@ class DesktopApp(tk.Tk):
         self.export_dir_label.configure(text=ui_text(lang, "export_dir"))
         self.pick_export_dir_btn.configure(text=ui_text(lang, "choose"))
         self.export_btn.configure(text=ui_text(lang, "export_current"))
+        self.batch_export_btn.configure(text=ui_text(lang, "export_all"))
         self.clear_cache_btn.configure(text=ui_text(lang, "clear_cache"))
         self.language_label.configure(text=ui_text(lang, "language"))
         self.runtime_mode_label.configure(text=ui_text(lang, "runtime_mode"))

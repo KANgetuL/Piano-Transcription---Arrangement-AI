@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.models.entities import ScoreDocument
-from src.services.export_service import export_score, export_to_midi, export_to_musicxml
+from src.services.export_service import export_score, export_scores, export_to_midi, export_to_musicxml
 
 
 def test_export_to_midi_creates_mid_file(tmp_path: Path) -> None:
@@ -58,3 +58,29 @@ def test_export_score_raises_for_unsupported_format(tmp_path: Path) -> None:
         assert False, "Expected ValueError"
     except ValueError as exc:
         assert "Unsupported export format" in str(exc)
+
+
+def test_export_scores_exports_multiple_scores(tmp_path: Path) -> None:
+    scores = [
+        ScoreDocument(title="s1", notes=["n1"], tempo_bpm=100),
+        ScoreDocument(title="s2", notes=["n2"], tempo_bpm=120),
+    ]
+
+    outputs = export_scores(scores, tmp_path, "txt")
+
+    assert len(outputs) == 2
+    assert outputs[0].name == "s1.txt"
+    assert outputs[1].name == "s2.txt"
+    assert all(path.exists() for path in outputs)
+
+
+def test_export_scores_renames_duplicate_titles(tmp_path: Path) -> None:
+    scores = [
+        ScoreDocument(title="dup", notes=["n1"], tempo_bpm=100),
+        ScoreDocument(title="dup", notes=["n2"], tempo_bpm=120),
+    ]
+
+    outputs = export_scores(scores, tmp_path, "mid")
+
+    assert outputs[0].name == "dup.mid"
+    assert outputs[1].name == "dup_2.mid"
