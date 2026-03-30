@@ -32,8 +32,14 @@ def delete_uploaded_file(path: Path) -> None:
     delete_audio_file(path=path, supported_extensions=settings.supported_audio_extensions)
 
 
-def collect_batch_upload_files(paths: tuple[str, ...]) -> tuple[list[AudioFileInfo], list[Path]]:
+def collect_batch_upload_files(
+    paths: tuple[str, ...],
+    max_items: int = 5,
+) -> tuple[list[AudioFileInfo], list[Path], int]:
     """Validate selected files for batch upload and return valid infos plus skipped paths."""
+
+    if max_items < 1:
+        raise ValueError("max_items must be >= 1")
 
     settings = get_settings()
     valid_files: list[AudioFileInfo] = []
@@ -50,4 +56,10 @@ def collect_batch_upload_files(paths: tuple[str, ...]) -> tuple[list[AudioFileIn
             )
         except (FileNotFoundError, ValueError):
             skipped_files.append(path)
-    return valid_files, skipped_files
+
+    truncated_count = 0
+    if len(valid_files) > max_items:
+        truncated_count = len(valid_files) - max_items
+        valid_files = valid_files[:max_items]
+
+    return valid_files, skipped_files, truncated_count

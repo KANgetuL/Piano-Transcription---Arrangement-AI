@@ -65,9 +65,29 @@ def test_collect_batch_upload_files_filters_invalid_and_deduplicates(monkeypatch
     invalid = tmp_path / "bad.flac"
     invalid.write_bytes(b"y")
 
-    items, skipped = upload_workflow.collect_batch_upload_files((str(valid), str(valid), str(invalid)))
+    items, skipped, truncated = upload_workflow.collect_batch_upload_files((str(valid), str(valid), str(invalid)))
 
     assert len(items) == 1
     assert items[0].filename == "ok.mp3"
     assert len(skipped) == 1
     assert skipped[0].name == "bad.flac"
+    assert truncated == 0
+
+
+def test_collect_batch_upload_files_applies_max_items_cap(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        upload_workflow,
+        "get_settings",
+        lambda: type("S", (), {"supported_audio_extensions": (".mp3", ".wav")})(),
+    )
+    files = []
+    for idx in range(7):
+        path = tmp_path / f"f{idx}.mp3"
+        path.write_bytes(b"x")
+        files.append(str(path))
+
+    items, skipped, truncated = upload_workflow.collect_batch_upload_files(tuple(files), max_items=5)
+
+    assert len(items) == 5
+    assert skipped == []
+    assert truncated == 2

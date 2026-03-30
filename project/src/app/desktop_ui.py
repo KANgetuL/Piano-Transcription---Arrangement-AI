@@ -233,7 +233,7 @@ class DesktopApp(tk.Tk):
         if not file_paths:
             return
 
-        valid_files, skipped_files = collect_batch_upload_files(tuple(file_paths))
+        valid_files, skipped_files, truncated_count = collect_batch_upload_files(tuple(file_paths), max_items=5)
         if not valid_files:
             messagebox.showwarning(
                 ui_text(self.language_var.get(), "warning"),
@@ -255,6 +255,11 @@ class DesktopApp(tk.Tk):
             messagebox.showwarning(
                 ui_text(self.language_var.get(), "warning"),
                 ui_text(self.language_var.get(), "batch_upload_invalid_message").format(count=len(skipped_files)),
+            )
+        if truncated_count > 0:
+            messagebox.showwarning(
+                ui_text(self.language_var.get(), "warning"),
+                ui_text(self.language_var.get(), "batch_upload_limit_message").format(count=truncated_count),
             )
 
     def _refresh_uploads(self) -> None:
