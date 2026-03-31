@@ -10,7 +10,9 @@ def load_score_preview(
 ) -> str:
     """Load exported score text content with a safe size cap for UI preview."""
 
-    content = output_path.read_text(encoding="utf-8")
-    if len(content) <= max_chars:
-        return content
-    return f"{content[:max_chars]}\n{truncated_suffix}"
+    with output_path.open("r", encoding="utf-8") as file_obj:
+        preview = file_obj.read(max_chars + 1)
+
+    if len(preview) <= max_chars:
+        return preview
+    return f"{preview[:max_chars]}\n{truncated_suffix}"

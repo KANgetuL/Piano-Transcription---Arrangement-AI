@@ -32,3 +32,12 @@ def test_load_score_preview_uses_custom_truncated_suffix(tmp_path: Path) -> None
 
     assert preview.startswith("B" * 8)
     assert preview.endswith("... (preview truncated)")
+
+
+def test_load_score_preview_does_not_append_suffix_on_exact_limit(tmp_path: Path) -> None:
+    output = tmp_path / "exact.txt"
+    output.write_text("C" * 12, encoding="utf-8")
+
+    preview = load_score_preview(output, max_chars=12)
+
+    assert preview == "C" * 12
