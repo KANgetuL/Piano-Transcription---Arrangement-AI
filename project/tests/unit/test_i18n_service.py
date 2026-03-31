@@ -24,6 +24,8 @@ def test_ui_text_uses_selected_language() -> None:
     assert "悬停" in ui_text("zh_CN", "operation_hint_default")
     assert "Hover" in ui_text("en_US", "operation_hint_default")
     assert "batch export" in ui_text("en_US", "hint_export_all").lower()
+    assert ui_text("zh_CN", "open_export_dir_title") == "打开导出目录"
+    assert "Open export directory" in ui_text("en_US", "open_export_dir_prompt")
 
 
 def test_mode_description_localized_switches_language() -> None:

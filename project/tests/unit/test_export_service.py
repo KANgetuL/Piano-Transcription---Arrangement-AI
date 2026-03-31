@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import pytest
 
 from src.models.entities import ScoreDocument
 from src.services.export_service import export_score, export_scores, export_to_midi, export_to_musicxml
@@ -85,6 +86,7 @@ def test_export_scores_renames_duplicate_titles(tmp_path: Path) -> None:
     assert outputs[0].name == "dup.mid"
     assert outputs[1].name == "dup_2.mid"
 
-    def test_export_scores_empty_scores_raises_value_error(tmp_path: Path) -> None:
-        with pytest.raises(ValueError, match="scores cannot be empty"):
-            export_scores([], tmp_path, "musicxml")
+
+def test_export_scores_empty_scores_raises_value_error(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="scores cannot be empty"):
+        export_scores([], tmp_path, "musicxml")

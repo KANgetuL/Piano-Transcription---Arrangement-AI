@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 import tkinter as tk
 from concurrent.futures import CancelledError
 from concurrent.futures import Future
@@ -24,6 +26,18 @@ from src.services.score_preview_service import load_score_preview
 from src.services.task_queue_service import TaskQueueService
 from src.services.ui_settings_service import UiSettings, load_ui_settings, save_ui_settings
 from src.utils.logging_utils import configure_logging
+
+
+def open_directory_in_file_manager(target_dir: Path) -> None:
+    """Open a directory in the system file manager."""
+
+    resolved = target_dir.resolve()
+    if os.name == "nt":
+        os.startfile(str(resolved))  # type: ignore[attr-defined]
+        return
+
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    subprocess.run([opener, str(resolved)], check=True)
 
 
 class DesktopApp(tk.Tk):
@@ -499,6 +513,7 @@ class DesktopApp(tk.Tk):
             ui_text(self.language_var.get(), "export_success"),
             ui_text(self.language_var.get(), "export_success_message").format(output_path=output_path),
         )
+        self._ask_open_export_dir(output_dir)
 
     def _export_all_scores(self) -> None:
         if not self.processed_scores:
@@ -520,6 +535,23 @@ class DesktopApp(tk.Tk):
                 output_dir=output_dir,
             ),
         )
+        self._ask_open_export_dir(output_dir)
+
+    def _ask_open_export_dir(self, output_dir: Path) -> None:
+        should_open = messagebox.askyesno(
+            ui_text(self.language_var.get(), "open_export_dir_title"),
+            ui_text(self.language_var.get(), "open_export_dir_prompt").format(output_dir=output_dir),
+        )
+        if not should_open:
+            return
+
+        try:
+            open_directory_in_file_manager(output_dir)
+        except (AttributeError, OSError, subprocess.SubprocessError) as exc:
+            messagebox.showerror(
+                ui_text(self.language_var.get(), "error"),
+                ui_text(self.language_var.get(), "open_export_dir_failed").format(error=exc),
+            )
 
     def _set_preview_text(self, text: str) -> None:
         if self.preview_text is None:
