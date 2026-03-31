@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.services.i18n_service import mode_description_localized, normalize_language, ui_text
+from src.services.i18n_service import mode_description_localized, normalize_language, progress_stage_localized, ui_text
 
 
 def test_normalize_language_fallbacks_to_zh_cn() -> None:
@@ -42,3 +42,10 @@ def test_mode_description_localized_switches_language() -> None:
 
     assert "普通钢琴谱" in zh_desc
     assert "Standard piano score" in en_desc
+
+
+def test_progress_stage_localized_supports_stage_keys_and_legacy_text() -> None:
+    assert progress_stage_localized("progress_done", "zh_CN") == "处理完成"
+    assert progress_stage_localized("progress_done", "en_US") == "Completed"
+    assert progress_stage_localized("处理完成", "en_US") == "Completed"
+    assert progress_stage_localized("unknown-stage", "en_US") == "unknown-stage"

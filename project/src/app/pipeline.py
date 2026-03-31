@@ -47,21 +47,21 @@ def run_transcription_pipeline(
 
     settings = get_settings()
     started_at = perf_counter()
-    _emit_progress(progress_callback, 5, "校验音频", started_at)
+    _emit_progress(progress_callback, 5, "progress_validate_audio", started_at)
     validate_audio_file(source_path, settings.supported_audio_extensions)
-    _emit_progress(progress_callback, 25, "构建请求", started_at)
+    _emit_progress(progress_callback, 25, "progress_build_request", started_at)
     request = TranscriptionRequest(
         source_path=source_path,
         mode=mode,
         task_id=f"task_{uuid.uuid4().hex[:8]}",
         sample_rate=settings.model.default_sample_rate,
     )
-    _emit_progress(progress_callback, 55, "执行转写", started_at)
+    _emit_progress(progress_callback, 55, "progress_run_transcription", started_at)
     result = transcribe_with_adapters(request=request)
-    _emit_progress(progress_callback, 80, "生成乐谱", started_at)
+    _emit_progress(progress_callback, 80, "progress_generate_score", started_at)
     score = to_score_document(result)
-    _emit_progress(progress_callback, 92, "导出文件", started_at)
+    _emit_progress(progress_callback, 92, "progress_export_file", started_at)
     output_path = export_to_text(score=score, output_dir=settings.output_dir)
-    _emit_progress(progress_callback, 100, "处理完成", started_at)
+    _emit_progress(progress_callback, 100, "progress_done", started_at)
     logger.info("Pipeline finished. Output: %s", output_path)
     return score, output_path

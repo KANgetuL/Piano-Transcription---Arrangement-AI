@@ -224,6 +224,35 @@ _MODE_DESCRIPTIONS: dict[LanguageCode, dict[TranscriptionMode, str]] = {
     },
 }
 
+_PROGRESS_STAGE_TEXTS: dict[LanguageCode, dict[str, str]] = {
+    "zh_CN": {
+        "progress_validate_audio": "校验音频",
+        "progress_build_request": "构建请求",
+        "progress_run_transcription": "执行转写",
+        "progress_generate_score": "生成乐谱",
+        "progress_export_file": "导出文件",
+        "progress_done": "处理完成",
+    },
+    "en_US": {
+        "progress_validate_audio": "Validate audio",
+        "progress_build_request": "Build request",
+        "progress_run_transcription": "Run transcription",
+        "progress_generate_score": "Generate score",
+        "progress_export_file": "Export file",
+        "progress_done": "Completed",
+    },
+}
+
+# Backward-compatibility aliases for historical hardcoded stage texts.
+_PROGRESS_STAGE_ALIASES: dict[str, str] = {
+    "校验音频": "progress_validate_audio",
+    "构建请求": "progress_build_request",
+    "执行转写": "progress_run_transcription",
+    "生成乐谱": "progress_generate_score",
+    "导出文件": "progress_export_file",
+    "处理完成": "progress_done",
+}
+
 
 def normalize_language(value: str) -> LanguageCode:
     cleaned = value.strip()
@@ -244,3 +273,9 @@ def ui_text(language: str, key: str) -> str:
 def mode_description_localized(mode: TranscriptionMode, language: str) -> str:
     lang = normalize_language(language)
     return _MODE_DESCRIPTIONS[lang][mode]
+
+
+def progress_stage_localized(stage: str, language: str) -> str:
+    lang = normalize_language(language)
+    stage_key = _PROGRESS_STAGE_ALIASES.get(stage, stage)
+    return _PROGRESS_STAGE_TEXTS[lang].get(stage_key, stage)

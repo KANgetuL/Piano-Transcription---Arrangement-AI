@@ -14,7 +14,7 @@ from src.app.upload_workflow import collect_batch_upload_files, delete_uploaded_
 from src.models.entities import ScoreDocument
 from src.config.settings import get_settings
 from src.services.cache_management_service import clear_cache, get_cache_status
-from src.services.i18n_service import language_options, mode_description_localized, ui_text
+from src.services.i18n_service import language_options, mode_description_localized, progress_stage_localized, ui_text
 from src.services.model_update_service import check_model_updates, mark_model_updated
 from src.services.mode_preference_service import load_last_mode, save_last_mode
 from src.services.offline_health_service import get_offline_health_report
@@ -494,11 +494,12 @@ class DesktopApp(tk.Tk):
                 percent, stage, eta_sec = self.progress_updates.get_nowait()
             except Empty:
                 break
+            stage_display = progress_stage_localized(stage, self.language_var.get())
             self.progress_var.set(max(0, min(100, percent)))
             if eta_sec is not None:
                 self.status_var.set(
                     ui_text(self.language_var.get(), "progress_status_with_eta").format(
-                        stage=stage,
+                        stage=stage_display,
                         percent=percent,
                         eta_sec=eta_sec,
                     )
@@ -506,7 +507,7 @@ class DesktopApp(tk.Tk):
             else:
                 self.status_var.set(
                     ui_text(self.language_var.get(), "progress_status").format(
-                        stage=stage,
+                        stage=stage_display,
                         percent=percent,
                     )
                 )
