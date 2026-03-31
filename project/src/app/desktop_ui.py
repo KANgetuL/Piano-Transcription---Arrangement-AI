@@ -493,9 +493,20 @@ class DesktopApp(tk.Tk):
                 break
             self.progress_var.set(max(0, min(100, percent)))
             if eta_sec is not None:
-                self.status_var.set(f"{stage} ({percent}%) | 预计剩余 {eta_sec:.1f}s")
+                self.status_var.set(
+                    ui_text(self.language_var.get(), "progress_status_with_eta").format(
+                        stage=stage,
+                        percent=percent,
+                        eta_sec=eta_sec,
+                    )
+                )
             else:
-                self.status_var.set(f"{stage} ({percent}%)")
+                self.status_var.set(
+                    ui_text(self.language_var.get(), "progress_status").format(
+                        stage=stage,
+                        percent=percent,
+                    )
+                )
 
     def _cancel_task(self) -> None:
         if self.current_future is None:

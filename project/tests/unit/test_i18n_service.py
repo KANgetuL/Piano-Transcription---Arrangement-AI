@@ -28,6 +28,8 @@ def test_ui_text_uses_selected_language() -> None:
     assert "Open export directory" in ui_text("en_US", "open_export_dir_prompt")
     assert ui_text("zh_CN", "onboarding_title") == "欢迎使用"
     assert "Suggested first-run flow" in ui_text("en_US", "onboarding_message")
+    assert "预计剩余" in ui_text("zh_CN", "progress_status_with_eta")
+    assert "ETA" in ui_text("en_US", "progress_status_with_eta")
 
 
 def test_mode_description_localized_switches_language() -> None:
