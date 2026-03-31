@@ -15,7 +15,7 @@ from src.models.entities import ScoreDocument
 from src.config.settings import get_settings
 from src.services.cache_management_service import clear_cache, get_cache_status
 from src.services.i18n_service import language_options, mode_description_localized, progress_stage_localized, ui_text
-from src.services.model_update_service import check_model_updates, install_or_update_models_online, mark_model_updated
+from src.services.model_update_service import check_model_updates, mark_model_updated
 from src.services.mode_preference_service import load_last_mode, save_last_mode
 from src.services.offline_health_service import get_offline_health_report
 from src.services.offline_runtime_service import OfflineRuntimeStatus, ensure_offline_cache_dirs, inspect_offline_runtime
@@ -76,6 +76,7 @@ class DesktopApp(tk.Tk):
         self.offline_health_var = tk.StringVar(value="")
         self.update_status_var = tk.StringVar(value="")
         self.action_hint_var = tk.StringVar(value="")
+        self.model_update_actions_enabled = False
         self.last_score: ScoreDocument | None = None
         self.processed_scores: list[ScoreDocument] = []
 
@@ -218,9 +219,19 @@ class DesktopApp(tk.Tk):
         self.offline_health_btn = ttk.Button(export_frame, text="", command=self._check_offline_health)
         self.offline_health_btn.grid(row=1, column=8, sticky=tk.W, padx=(8, 0), pady=(6, 0))
 
-        self.update_check_btn = ttk.Button(export_frame, text="", command=self._check_model_updates)
+        self.update_check_btn = ttk.Button(
+            export_frame,
+            text="",
+            command=self._check_model_updates,
+            state=tk.DISABLED,
+        )
         self.update_check_btn.grid(row=1, column=6, sticky=tk.W, padx=(8, 0), pady=(6, 0))
-        self.mark_updated_btn = ttk.Button(export_frame, text="", command=self._mark_model_updated)
+        self.mark_updated_btn = ttk.Button(
+            export_frame,
+            text="",
+            command=self._mark_model_updated,
+            state=tk.DISABLED,
+        )
         self.mark_updated_btn.grid(row=1, column=7, sticky=tk.W, padx=(8, 0), pady=(6, 0))
         ttk.Label(export_frame, textvariable=self.offline_health_var).grid(row=2, column=0, columnspan=9, sticky=tk.W, pady=(4, 0))
         ttk.Label(export_frame, textvariable=self.update_status_var).grid(row=3, column=0, columnspan=9, sticky=tk.W, pady=(2, 0))
@@ -695,6 +706,13 @@ class DesktopApp(tk.Tk):
         self.update_status_var.set(ui_text(self.language_var.get(), "update_status_latest"))
 
     def _check_model_updates(self) -> None:
+        if not self.model_update_actions_enabled:
+            messagebox.showinfo(
+                ui_text(self.language_var.get(), "prompt"),
+                ui_text(self.language_var.get(), "update_actions_disabled_message"),
+            )
+            return
+
         report = check_model_updates(self.model_settings)
         self._refresh_update_status()
         if not report.has_updates:
@@ -707,52 +725,19 @@ class DesktopApp(tk.Tk):
             for item in report.items
             if item.needs_update
         )
-        should_install = messagebox.askyesno(
-            ui_text(self.language_var.get(), "update_install_confirm_title"),
-            ui_text(self.language_var.get(), "update_install_confirm_message").format(details=details),
+        messagebox.showwarning(
+            ui_text(self.language_var.get(), "warning"),
+            ui_text(self.language_var.get(), "update_pending_message").format(details=details),
         )
-        if not should_install:
-            messagebox.showwarning(
-                ui_text(self.language_var.get(), "warning"),
-                ui_text(self.language_var.get(), "update_pending_message").format(details=details),
-            )
-            return
-
-        self.status_var.set(ui_text(self.language_var.get(), "update_installing"))
-        target_models = tuple(item.name for item in report.items if item.needs_update)
-        try:
-            install_report = install_or_update_models_online(self.model_settings, target_models)
-        except Exception as exc:
-            self.status_var.set(ui_text(self.language_var.get(), "ready"))
-            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
-            return
-
-        self._refresh_update_status()
-        self._refresh_offline_health_status()
-        self.status_var.set(ui_text(self.language_var.get(), "ready"))
-
-        failed_details = "\n".join(
-            f"{item.name}: {item.detail}"
-            for item in install_report.items
-            if not item.success
-        )
-        summary = ui_text(self.language_var.get(), "update_install_result_message").format(
-            success=install_report.success_count,
-            failed=install_report.failed_count,
-        )
-        if install_report.failed_count:
-            messagebox.showwarning(
-                ui_text(self.language_var.get(), "warning"),
-                ui_text(self.language_var.get(), "update_install_failed_message").format(
-                    summary=summary,
-                    details=failed_details,
-                ),
-            )
-            return
-
-        messagebox.showinfo(ui_text(self.language_var.get(), "complete"), summary)
 
     def _mark_model_updated(self) -> None:
+        if not self.model_update_actions_enabled:
+            messagebox.showinfo(
+                ui_text(self.language_var.get(), "prompt"),
+                ui_text(self.language_var.get(), "update_actions_disabled_message"),
+            )
+            return
+
         model_name = simpledialog.askstring(
             ui_text(self.language_var.get(), "mark_updated"),
             ui_text(self.language_var.get(), "mark_update_hint"),
@@ -805,6 +790,9 @@ class DesktopApp(tk.Tk):
         self.offline_health_btn.configure(text=ui_text(lang, "offline_health_check"))
         self.update_check_btn.configure(text=ui_text(lang, "update_check"))
         self.mark_updated_btn.configure(text=ui_text(lang, "mark_updated"))
+        if not self.model_update_actions_enabled:
+            self.update_check_btn.configure(state=tk.DISABLED)
+            self.mark_updated_btn.configure(state=tk.DISABLED)
 
         self.preview_frame.configure(text=ui_text(lang, "preview"))
         if self.last_score is None:
