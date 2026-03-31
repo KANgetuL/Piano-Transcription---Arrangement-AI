@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.util
 from pathlib import Path
+import subprocess
+import sys
 
 from src.config.settings import ModelAdapterSettings
 
@@ -11,6 +14,18 @@ TARGET_MODEL_VERSIONS: dict[str, str] = {
     "basic_pitch": "v1",
 }
 
+MODEL_INSTALL_SPECS: dict[str, str] = {
+    "demucs": "demucs>=4.0.0",
+    "crepe": "crepe",
+    "basic_pitch": "basic-pitch",
+}
+
+_RUNTIME_MODULES: dict[str, str] = {
+    "demucs": "demucs",
+    "crepe": "crepe",
+    "basic_pitch": "basic_pitch",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class ModelVersionItem:
@@ -18,7 +33,29 @@ class ModelVersionItem:
     path: Path
     installed_version: str | None
     target_version: str
+    runtime_available: bool
     needs_update: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ModelInstallItem:
+    name: str
+    command: tuple[str, ...]
+    success: bool
+    detail: str
+
+
+@dataclass(frozen=True, slots=True)
+class ModelInstallReport:
+    items: tuple[ModelInstallItem, ...]
+
+    @property
+    def success_count(self) -> int:
+        return sum(1 for item in self.items if item.success)
+
+    @property
+    def failed_count(self) -> int:
+        return sum(1 for item in self.items if not item.success)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,18 +96,25 @@ def _model_paths(settings: ModelAdapterSettings) -> tuple[tuple[str, Path], ...]
     )
 
 
+def _is_runtime_available(model_name: str) -> bool:
+    module_name = _RUNTIME_MODULES[model_name]
+    return importlib.util.find_spec(module_name) is not None
+
+
 def check_model_updates(settings: ModelAdapterSettings) -> ModelUpdateReport:
     items: list[ModelVersionItem] = []
     for name, path in _model_paths(settings):
         target = TARGET_MODEL_VERSIONS[name]
         installed = _read_version(path)
-        needs_update = installed != target
+        runtime_available = _is_runtime_available(name)
+        needs_update = installed != target or not runtime_available
         items.append(
             ModelVersionItem(
                 name=name,
                 path=path,
                 installed_version=installed,
                 target_version=target,
+                runtime_available=runtime_available,
                 needs_update=needs_update,
             )
         )
@@ -89,3 +133,39 @@ def mark_model_updated(settings: ModelAdapterSettings, model_name: str) -> Model
             break
 
     return check_model_updates(settings)
+
+
+def install_or_update_models_online(
+    settings: ModelAdapterSettings,
+    model_names: tuple[str, ...] | None = None,
+) -> ModelInstallReport:
+    names = model_names or tuple(name for name, _ in _model_paths(settings))
+    items: list[ModelInstallItem] = []
+
+    for name in names:
+        normalized = name.strip().lower()
+        target_version = TARGET_MODEL_VERSIONS.get(normalized)
+        spec = MODEL_INSTALL_SPECS.get(normalized)
+        if target_version is None or spec is None:
+            raise ValueError(f"Unsupported model name: {name}")
+
+        command = (sys.executable, "-m", "pip", "install", "--upgrade", spec)
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            path = dict(_model_paths(settings))[normalized]
+            _write_version(path, target_version)
+            detail = (result.stdout or "installed").strip().splitlines()[-1]
+            items.append(ModelInstallItem(name=normalized, command=command, success=True, detail=detail))
+            continue
+
+        error_text = (result.stderr or result.stdout or "install failed").strip()
+        items.append(
+            ModelInstallItem(
+                name=normalized,
+                command=command,
+                success=False,
+                detail=error_text,
+            )
+        )
+
+    return ModelInstallReport(items=tuple(items))

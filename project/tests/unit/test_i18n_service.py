@@ -34,6 +34,10 @@ def test_ui_text_uses_selected_language() -> None:
     assert "Pending updates" in ui_text("en_US", "offline_health_pending_updates")
     assert "预览已截断" in ui_text("zh_CN", "preview_truncated_suffix")
     assert "preview truncated" in ui_text("en_US", "preview_truncated_suffix")
+    assert "联网安装" in ui_text("zh_CN", "update_install_confirm_message")
+    assert "Install/update online" in ui_text("en_US", "update_install_confirm_message")
+    assert "成功" in ui_text("zh_CN", "update_install_result_message")
+    assert "succeeded" in ui_text("en_US", "update_install_result_message")
 
 
 def test_mode_description_localized_switches_language() -> None:

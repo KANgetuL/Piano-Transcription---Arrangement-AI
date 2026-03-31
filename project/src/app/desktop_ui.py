@@ -15,7 +15,7 @@ from src.models.entities import ScoreDocument
 from src.config.settings import get_settings
 from src.services.cache_management_service import clear_cache, get_cache_status
 from src.services.i18n_service import language_options, mode_description_localized, progress_stage_localized, ui_text
-from src.services.model_update_service import check_model_updates, mark_model_updated
+from src.services.model_update_service import check_model_updates, install_or_update_models_online, mark_model_updated
 from src.services.mode_preference_service import load_last_mode, save_last_mode
 from src.services.offline_health_service import get_offline_health_report
 from src.services.offline_runtime_service import OfflineRuntimeStatus, ensure_offline_cache_dirs, inspect_offline_runtime
@@ -702,14 +702,55 @@ class DesktopApp(tk.Tk):
             return
 
         details = "\n".join(
-            f"{item.name}: {item.installed_version or 'none'} -> {item.target_version} ({item.path})"
+            f"{item.name}: {item.installed_version or 'none'} -> {item.target_version} "
+            f"(runtime={'ok' if item.runtime_available else 'missing'}) ({item.path})"
             for item in report.items
             if item.needs_update
         )
-        messagebox.showwarning(
-            ui_text(self.language_var.get(), "warning"),
-            ui_text(self.language_var.get(), "update_pending_message").format(details=details),
+        should_install = messagebox.askyesno(
+            ui_text(self.language_var.get(), "update_install_confirm_title"),
+            ui_text(self.language_var.get(), "update_install_confirm_message").format(details=details),
         )
+        if not should_install:
+            messagebox.showwarning(
+                ui_text(self.language_var.get(), "warning"),
+                ui_text(self.language_var.get(), "update_pending_message").format(details=details),
+            )
+            return
+
+        self.status_var.set(ui_text(self.language_var.get(), "update_installing"))
+        target_models = tuple(item.name for item in report.items if item.needs_update)
+        try:
+            install_report = install_or_update_models_online(self.model_settings, target_models)
+        except Exception as exc:
+            self.status_var.set(ui_text(self.language_var.get(), "ready"))
+            messagebox.showerror(ui_text(self.language_var.get(), "error"), str(exc))
+            return
+
+        self._refresh_update_status()
+        self._refresh_offline_health_status()
+        self.status_var.set(ui_text(self.language_var.get(), "ready"))
+
+        failed_details = "\n".join(
+            f"{item.name}: {item.detail}"
+            for item in install_report.items
+            if not item.success
+        )
+        summary = ui_text(self.language_var.get(), "update_install_result_message").format(
+            success=install_report.success_count,
+            failed=install_report.failed_count,
+        )
+        if install_report.failed_count:
+            messagebox.showwarning(
+                ui_text(self.language_var.get(), "warning"),
+                ui_text(self.language_var.get(), "update_install_failed_message").format(
+                    summary=summary,
+                    details=failed_details,
+                ),
+            )
+            return
+
+        messagebox.showinfo(ui_text(self.language_var.get(), "complete"), summary)
 
     def _mark_model_updated(self) -> None:
         model_name = simpledialog.askstring(
