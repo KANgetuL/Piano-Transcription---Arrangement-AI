@@ -32,6 +32,8 @@ def test_ui_text_uses_selected_language() -> None:
     assert "ETA" in ui_text("en_US", "progress_status_with_eta")
     assert "缺失缓存" in ui_text("zh_CN", "offline_health_missing_cache")
     assert "Pending updates" in ui_text("en_US", "offline_health_pending_updates")
+    assert "预览已截断" in ui_text("zh_CN", "preview_truncated_suffix")
+    assert "preview truncated" in ui_text("en_US", "preview_truncated_suffix")
 
 
 def test_mode_description_localized_switches_language() -> None:

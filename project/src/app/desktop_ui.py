@@ -475,7 +475,10 @@ class DesktopApp(tk.Tk):
         self.export_btn.configure(state=tk.NORMAL)
         self.batch_export_btn.configure(state=tk.NORMAL)
         try:
-            preview = load_score_preview(result.output_path)
+            preview = load_score_preview(
+                result.output_path,
+                truncated_suffix=ui_text(self.language_var.get(), "preview_truncated_suffix"),
+            )
         except OSError as exc:
             self._set_preview_text(ui_text(self.language_var.get(), "preview_load_failed").format(error=exc))
         else:
