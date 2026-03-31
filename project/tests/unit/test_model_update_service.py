@@ -97,3 +97,35 @@ def test_install_or_update_models_online_reports_failure(tmp_path: Path, monkeyp
     assert install_report.success_count == 0
     assert install_report.failed_count == 1
     assert "network timeout" in install_report.items[0].detail
+
+
+def test_install_or_update_models_online_in_frozen_exe_skips_subprocess(tmp_path: Path, monkeypatch) -> None:
+    settings = _build_settings(tmp_path)
+    monkeypatch.setattr(model_update_service.sys, "frozen", True, raising=False)
+
+    def _unexpected_run(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("subprocess.run should not be called in frozen mode")
+
+    monkeypatch.setattr(model_update_service.subprocess, "run", _unexpected_run)
+
+    install_report = install_or_update_models_online(settings, ("demucs", "crepe"))
+    assert install_report.success_count == 0
+    assert install_report.failed_count == 2
+    assert "not supported" in install_report.items[0].detail
+
+
+def test_install_or_update_models_online_fails_when_runtime_still_missing(tmp_path: Path, monkeypatch) -> None:
+    settings = _build_settings(tmp_path)
+
+    class _SuccessResult:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+
+    monkeypatch.setattr(model_update_service.subprocess, "run", lambda *_args, **_kwargs: _SuccessResult())
+    monkeypatch.setattr(model_update_service, "_is_runtime_available", lambda _name: False)
+
+    install_report = install_or_update_models_online(settings, ("basic_pitch",))
+    assert install_report.success_count == 0
+    assert install_report.failed_count == 1
+    assert "still unavailable" in install_report.items[0].detail

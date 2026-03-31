@@ -139,6 +139,20 @@ def install_or_update_models_online(
     settings: ModelAdapterSettings,
     model_names: tuple[str, ...] | None = None,
 ) -> ModelInstallReport:
+    if getattr(sys, "frozen", False):
+        # In PyInstaller exe, sys.executable points to current app. Running
+        # "sys.executable -m pip" relaunches the app recursively.
+        unsupported_items = tuple(
+            ModelInstallItem(
+                name=name.strip().lower(),
+                command=("<frozen-exe>",),
+                success=False,
+                detail="online install is not supported in packaged exe",
+            )
+            for name in (model_names or tuple(name for name, _ in _model_paths(settings)))
+        )
+        return ModelInstallReport(items=unsupported_items)
+
     names = model_names or tuple(name for name, _ in _model_paths(settings))
     items: list[ModelInstallItem] = []
 
@@ -152,6 +166,16 @@ def install_or_update_models_online(
         command = (sys.executable, "-m", "pip", "install", "--upgrade", spec)
         result = subprocess.run(command, capture_output=True, text=True, check=False)
         if result.returncode == 0:
+            if not _is_runtime_available(normalized):
+                items.append(
+                    ModelInstallItem(
+                        name=normalized,
+                        command=command,
+                        success=False,
+                        detail="install command succeeded but runtime module is still unavailable",
+                    )
+                )
+                continue
             path = dict(_model_paths(settings))[normalized]
             _write_version(path, target_version)
             detail = (result.stdout or "installed").strip().splitlines()[-1]
