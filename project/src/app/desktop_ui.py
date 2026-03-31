@@ -657,9 +657,17 @@ class DesktopApp(tk.Tk):
 
         details: list[str] = []
         if report.missing_models:
-            details.append(f"missing_cache={', '.join(report.missing_models)}")
+            details.append(
+                ui_text(self.language_var.get(), "offline_health_missing_cache").format(
+                    models=", ".join(report.missing_models)
+                )
+            )
         if report.pending_update_models:
-            details.append(f"pending_updates={', '.join(report.pending_update_models)}")
+            details.append(
+                ui_text(self.language_var.get(), "offline_health_pending_updates").format(
+                    models=", ".join(report.pending_update_models)
+                )
+            )
         messagebox.showwarning(
             ui_text(self.language_var.get(), "warning"),
             ui_text(self.language_var.get(), "offline_health_not_ready_message").format(details="\n".join(details)),

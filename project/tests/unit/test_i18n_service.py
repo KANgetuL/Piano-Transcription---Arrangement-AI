@@ -30,6 +30,8 @@ def test_ui_text_uses_selected_language() -> None:
     assert "Suggested first-run flow" in ui_text("en_US", "onboarding_message")
     assert "预计剩余" in ui_text("zh_CN", "progress_status_with_eta")
     assert "ETA" in ui_text("en_US", "progress_status_with_eta")
+    assert "缺失缓存" in ui_text("zh_CN", "offline_health_missing_cache")
+    assert "Pending updates" in ui_text("en_US", "offline_health_pending_updates")
 
 
 def test_mode_description_localized_switches_language() -> None:
