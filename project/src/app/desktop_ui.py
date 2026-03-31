@@ -70,6 +70,7 @@ class DesktopApp(tk.Tk):
         self.export_dir_var = tk.StringVar(value=ui_settings.export_dir)
         self.upload_dir_var = tk.StringVar(value=ui_settings.upload_dir)
         self.runtime_mode_var = tk.StringVar(value=ui_settings.runtime_mode)
+        self.show_onboarding_tip = ui_settings.show_onboarding_tip
         self.cache_status_var = tk.StringVar(value="")
         self.offline_status_var = tk.StringVar(value="")
         self.offline_health_var = tk.StringVar(value="")
@@ -80,6 +81,18 @@ class DesktopApp(tk.Tk):
 
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.after(0, self._show_onboarding_tip_if_needed)
+
+    def _show_onboarding_tip_if_needed(self) -> None:
+        if not self.show_onboarding_tip:
+            return
+
+        messagebox.showinfo(
+            ui_text(self.language_var.get(), "onboarding_title"),
+            ui_text(self.language_var.get(), "onboarding_message"),
+        )
+        self.show_onboarding_tip = False
+        self._save_ui_settings()
 
     def _build_layout(self) -> None:
         root = ttk.Frame(self, padding=16)
@@ -746,6 +759,7 @@ class DesktopApp(tk.Tk):
             upload_dir=self.upload_dir_var.get().strip() or ".",
             language=self.language_var.get().strip() or "zh_CN",
             runtime_mode=self.runtime_mode_var.get().strip().lower() or "normal",
+            show_onboarding_tip=self.show_onboarding_tip,
         )
         try:
             save_ui_settings(self.ui_settings_file, settings)

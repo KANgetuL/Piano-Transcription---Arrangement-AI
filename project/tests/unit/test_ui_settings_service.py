@@ -13,6 +13,7 @@ def test_load_ui_settings_returns_defaults_when_missing(tmp_path: Path) -> None:
     assert settings.upload_dir == "."
     assert settings.language == "zh_CN"
     assert settings.runtime_mode == "normal"
+    assert settings.show_onboarding_tip is True
 
 
 def test_save_and_load_ui_settings_roundtrip(tmp_path: Path) -> None:
@@ -25,6 +26,7 @@ def test_save_and_load_ui_settings_roundtrip(tmp_path: Path) -> None:
             upload_dir="./audio",
             language="en_US",
             runtime_mode="strict",
+            show_onboarding_tip=False,
         ),
     )
 
@@ -35,12 +37,13 @@ def test_save_and_load_ui_settings_roundtrip(tmp_path: Path) -> None:
     assert settings.upload_dir == "./audio"
     assert settings.language == "en_US"
     assert settings.runtime_mode == "strict"
+    assert settings.show_onboarding_tip is False
 
 
 def test_load_ui_settings_normalizes_invalid_values(tmp_path: Path) -> None:
     settings_file = tmp_path / "ui_settings.json"
     settings_file.write_text(
-        '{"export_format":"PDF","export_dir":"","upload_dir":"","language":"fr_FR","runtime_mode":"expert"}',
+        '{"export_format":"PDF","export_dir":"","upload_dir":"","language":"fr_FR","runtime_mode":"expert","show_onboarding_tip":"yes"}',
         encoding="utf-8",
     )
 
@@ -51,3 +54,4 @@ def test_load_ui_settings_normalizes_invalid_values(tmp_path: Path) -> None:
     assert settings.upload_dir == "."
     assert settings.language == "zh_CN"
     assert settings.runtime_mode == "normal"
+    assert settings.show_onboarding_tip is True

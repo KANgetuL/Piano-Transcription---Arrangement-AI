@@ -12,6 +12,7 @@ class UiSettings:
     upload_dir: str = "."
     language: str = "zh_CN"
     runtime_mode: str = "normal"
+    show_onboarding_tip: bool = True
 
 
 def load_ui_settings(settings_file: Path) -> UiSettings:
@@ -43,12 +44,17 @@ def load_ui_settings(settings_file: Path) -> UiSettings:
     if runtime_mode not in {"normal", "strict"}:
         runtime_mode = "normal"
 
+    show_onboarding_tip = payload.get("show_onboarding_tip", True)
+    if not isinstance(show_onboarding_tip, bool):
+        show_onboarding_tip = True
+
     return UiSettings(
         export_format=export_format,
         export_dir=export_dir,
         upload_dir=upload_dir,
         language=language,
         runtime_mode=runtime_mode,
+        show_onboarding_tip=show_onboarding_tip,
     )
 
 
