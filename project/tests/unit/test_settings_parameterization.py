@@ -19,3 +19,13 @@ def test_settings_reads_env_overrides(monkeypatch) -> None:
     assert settings.model.pitch_confidence_threshold == 0.7
     assert settings.model.inference_device == "cuda"
     assert settings.model.demucs_model_path == Path("./models/custom_demucs")
+
+
+def test_settings_defaults_use_project_root_paths() -> None:
+    settings = get_settings()
+    project_root = Path(__file__).resolve().parents[2]
+
+    assert settings.output_dir == project_root / "outputs"
+    assert settings.model.demucs_model_path == project_root / "models" / "demucs"
+    assert settings.model.crepe_model_path == project_root / "models" / "crepe"
+    assert settings.model.basic_pitch_model_path == project_root / "models" / "basic_pitch"
