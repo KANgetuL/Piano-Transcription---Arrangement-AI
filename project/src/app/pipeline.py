@@ -56,8 +56,12 @@ def run_transcription_pipeline(
         task_id=f"task_{uuid.uuid4().hex[:8]}",
         sample_rate=settings.model.default_sample_rate,
     )
+
+    def _on_model_debug(message: str) -> None:
+        _emit_progress(progress_callback, 58, message, started_at)
+
     _emit_progress(progress_callback, 55, "progress_run_transcription", started_at)
-    result = transcribe_with_adapters(request=request)
+    result = transcribe_with_adapters(request=request, model_debug_callback=_on_model_debug)
     _emit_progress(progress_callback, 80, "progress_generate_score", started_at)
     score = to_score_document(result)
     _emit_progress(progress_callback, 92, "progress_export_file", started_at)

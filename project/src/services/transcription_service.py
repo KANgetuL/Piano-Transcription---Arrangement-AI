@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 from src.models.entities import (
     TranscriptionRequest,
@@ -20,6 +21,7 @@ def transcribe_with_adapters(
     pitch_adapter: PitchAdapter | None = None,
     harmony_adapter: HarmonyAdapter | None = None,
     runtime_probe_result: RuntimeProbeResult | None = None,
+    model_debug_callback: Callable[[str], None] | None = None,
 ) -> TranscriptionResult:
     """Run placeholder adapter pipeline to produce structured transcription output."""
 
@@ -37,8 +39,18 @@ def transcribe_with_adapters(
     harmony = harmony_adapter or HarmonyAdapter.from_settings(settings)
 
     segments = separation.separate(source_path=request.source_path, sample_rate=request.sample_rate)
-    base_notes = pitch.predict_notes(segments=segments, mode=request.mode)
-    base_chords = harmony.estimate_chords(segments=segments)
+    base_notes, used_fallback, failure_reasons = pitch.predict_notes(
+        source_path=request.source_path,
+        segments=segments,
+        mode=request.mode,
+        sample_rate=request.sample_rate,
+        debug_callback=model_debug_callback,
+    )
+    if used_fallback and model_debug_callback:
+        joined_reasons = " | ".join(failure_reasons) if failure_reasons else "未知原因"
+        model_debug_callback(f"模型告警: 已回退到占位输出。失败原因: {joined_reasons}")
+
+    base_chords = harmony.estimate_chords(segments=segments, notes=base_notes)
     notes, chords = apply_mode_arrangement(request.mode, base_notes, base_chords)
 
     return TranscriptionResult(

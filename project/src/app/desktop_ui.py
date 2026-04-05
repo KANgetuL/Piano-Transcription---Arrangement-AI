@@ -79,6 +79,8 @@ class DesktopApp(tk.Tk):
         self.model_update_actions_enabled = False
         self.last_score: ScoreDocument | None = None
         self.processed_scores: list[ScoreDocument] = []
+        self.model_debug_log: list[str] = []
+        self.model_fallback_warning: str | None = None
 
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -424,6 +426,8 @@ class DesktopApp(tk.Tk):
         self.cancel_btn.configure(state=tk.NORMAL)
         self.export_btn.configure(state=tk.DISABLED)
         self.progress_var.set(0)
+        self.model_debug_log.clear()
+        self.model_fallback_warning = None
         self._set_preview_text(ui_text(self.language_var.get(), "preview_loading"))
         os.environ["PIANOTRANS_STRICT_RUNTIME"] = "1" if self.runtime_mode_var.get() == "strict" else "0"
 
@@ -498,6 +502,13 @@ class DesktopApp(tk.Tk):
             ui_text(self.language_var.get(), "complete"),
             ui_text(self.language_var.get(), "complete_message").format(output_path=result.output_path),
         )
+        if self.model_fallback_warning:
+            messagebox.showwarning(
+                ui_text(self.language_var.get(), "warning"),
+                ui_text(self.language_var.get(), "model_fallback_warning_message").format(
+                    detail=self.model_fallback_warning
+                ),
+            )
 
     def _drain_progress_updates(self) -> None:
         while True:
@@ -505,7 +516,13 @@ class DesktopApp(tk.Tk):
                 percent, stage, eta_sec = self.progress_updates.get_nowait()
             except Empty:
                 break
-            stage_display = progress_stage_localized(stage, self.language_var.get())
+            if stage.startswith("模型阶段:") or stage.startswith("模型告警:"):
+                self.model_debug_log.append(stage)
+                if stage.startswith("模型告警: 已回退到占位输出"):
+                    self.model_fallback_warning = stage
+                stage_display = stage
+            else:
+                stage_display = progress_stage_localized(stage, self.language_var.get())
             self.progress_var.set(max(0, min(100, percent)))
             if eta_sec is not None:
                 self.status_var.set(

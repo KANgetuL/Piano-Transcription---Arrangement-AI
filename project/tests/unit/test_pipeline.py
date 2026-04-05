@@ -47,3 +47,4 @@ def test_run_pipeline_reports_progress_updates(tmp_path: Path, monkeypatch) -> N
     assert updates[-1][:2] == (100, "progress_done")
     assert updates == sorted(updates, key=lambda item: item[0])
     assert any(item[2] is not None for item in updates if item[0] not in (0, 100))
+    assert any(item[1].startswith("模型阶段:") for item in updates)
