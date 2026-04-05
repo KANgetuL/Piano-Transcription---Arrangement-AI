@@ -64,10 +64,10 @@ class SeparationAdapter:
 
     def _probe_duration(self, source_path: Path, fallback_sample_rate: int) -> float:
         try:
-            torchaudio = importlib.import_module("torchaudio")
-            info = torchaudio.info(str(source_path))
-            if info.sample_rate > 0:
-                return float(info.num_frames) / float(info.sample_rate)
+            soundfile = importlib.import_module("soundfile")
+            info = soundfile.info(str(source_path))
+            if info.samplerate > 0:
+                return float(info.frames) / float(info.samplerate)
         except Exception as exc:
             logger.warning("Audio duration probe failed for %s: %s", source_path, exc)
 
@@ -78,6 +78,12 @@ class SeparationAdapter:
                 frames = wav_file.getnframes()
                 sample_rate = wav_file.getframerate() or fallback_sample_rate
                 return float(frames) / float(sample_rate)
+        except Exception:
+            pass
+
+        try:
+            librosa = importlib.import_module("librosa")
+            return float(librosa.get_duration(path=str(source_path)))
         except Exception:
             return self.chunk_duration_sec
 
@@ -223,16 +229,7 @@ class PitchAdapter:
     def _try_crepe(self, source_path: Path, sample_rate: int) -> tuple[list[NoteEvent], str | None]:
         try:
             crepe = importlib.import_module("crepe")
-            torchaudio = importlib.import_module("torchaudio")
-            waveform, sr = torchaudio.load(str(source_path))
-            if waveform.ndim > 1:
-                mono = waveform.mean(dim=0)
-            else:
-                mono = waveform
-            if sr != sample_rate:
-                mono = torchaudio.functional.resample(mono.unsqueeze(0), sr, sample_rate).squeeze(0)
-                sr = sample_rate
-            audio_np = mono.detach().cpu().numpy()
+            audio_np, sr = self._load_audio_mono(source_path, sample_rate)
             times, freqs, confs, _ = crepe.predict(audio_np, sr, viterbi=True, step_size=20)
         except Exception as exc:
             logger.info("CREPE inference skipped: %s", exc)
@@ -267,14 +264,9 @@ class PitchAdapter:
     def _try_torchaudio_pitch(self, source_path: Path, sample_rate: int) -> tuple[list[NoteEvent], str | None]:
         try:
             torchaudio = importlib.import_module("torchaudio")
-            waveform, sr = torchaudio.load(str(source_path))
-            if waveform.ndim > 1:
-                mono = waveform.mean(dim=0, keepdim=True)
-            else:
-                mono = waveform.unsqueeze(0)
-            if sr != sample_rate:
-                mono = torchaudio.functional.resample(mono, sr, sample_rate)
-                sr = sample_rate
+            torch = importlib.import_module("torch")
+            audio_np, sr = self._load_audio_mono(source_path, sample_rate)
+            mono = torch.from_numpy(audio_np).float().unsqueeze(0)
 
             frame_time = 0.03
             pitch_track = torchaudio.functional.detect_pitch_frequency(mono, sample_rate=sr, frame_time=frame_time)
@@ -310,6 +302,32 @@ class PitchAdapter:
         if not merged:
             return [], "torchaudio 未输出可用音符"
         return merged, None
+
+    def _load_audio_mono(self, source_path: Path, sample_rate: int) -> tuple[object, int]:
+        load_errors: list[str] = []
+
+        try:
+            soundfile = importlib.import_module("soundfile")
+            audio, sr = soundfile.read(str(source_path), dtype="float32", always_2d=False)
+            if getattr(audio, "ndim", 1) > 1:
+                audio = audio.mean(axis=1)
+
+            if sr != sample_rate:
+                librosa = importlib.import_module("librosa")
+                audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
+                sr = sample_rate
+            return audio, int(sr)
+        except Exception as exc:
+            load_errors.append(f"soundfile: {exc}")
+
+        try:
+            librosa = importlib.import_module("librosa")
+            audio, sr = librosa.load(str(source_path), sr=sample_rate, mono=True)
+            return audio, int(sr)
+        except Exception as exc:
+            load_errors.append(f"librosa: {exc}")
+
+        raise RuntimeError("音频加载失败: " + " | ".join(load_errors))
 
     def _merge_dense_frames(self, notes: list[NoteEvent]) -> list[NoteEvent]:
         if not notes:

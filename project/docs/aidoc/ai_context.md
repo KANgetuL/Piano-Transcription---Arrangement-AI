@@ -440,3 +440,27 @@
   - 完成测试程序打包并产出可执行文件。
 - 结果标记: DONE。
 - 错误类型: 无阻塞错误。
+
+## 对话关键节点（2026-04-05 - 模型推理缺包回退修复任务）
+- 任务启动时间: 2026-04-05。
+- 核心操作动作:
+	- 对比 `.conda` 与 `.conda311` 模型依赖导入状态，定位到 `.conda` 兼容性问题。
+	- 在 `.conda311` 安装 PyInstaller 并重新构建测试包。
+	- 为动态导入模块补充 hidden-import 与 collect-all，确保 basic_pitch/crepe/torchaudio 被打包。
+	- 创建并执行临时测试文件验证依赖导入（1 passed）后删除。
+- 结果标记: DONE。
+- 错误类型:
+	- 打包阶段出现非阻塞警告（如 tbb12.dll 缺失与若干 hidden import warning），不影响本次目标产物生成。
+
+## 对话关键节点（2026-04-05 - 模型推理回退二次修复任务）
+- 任务启动时间: 2026-04-05。
+- 核心操作动作:
+	- 在 `.conda311` 复现并区分问题来源：`scipy`/`crepe` 可用，`torchaudio.load` 因 `torchcodec` 动态库失败。
+	- 修复环境兼容性：重装 `scipy` 后回滚并固定 `numpy==1.26.4`，维持 TensorFlow/basic_pitch 兼容。
+	- 改造 `model_adapters` 音频读取链路，关键路径改用 `soundfile/librosa`，去除对 `torchaudio.load` 的硬依赖。
+	- 新增并执行临时测试验证 `torchaudio` 音高分支不再依赖 `torchaudio.load`（1 passed），随后删除临时测试。
+	- 执行 `python -m src.app.main --runtime-demo`，结果 `all_ok=true`，分离/音高/和声三阶段均 `ok`。
+	- 核查工作区解释器设置，确认默认解释器已指向 `.conda311/python.exe`。
+- 结果标记: DONE。
+- 错误类型:
+	- `torchcodec` 在 Windows 下动态库加载失败（`libtorchcodec_core*.dll`），通过代码绕开脆弱解码链路后消除阻塞影响。

@@ -85,3 +85,5 @@
 - 风险: 文档与实现偏离。
 - 缓解: 每周文档同步检查，变更先更文档后改代码。
 - DONE: 完成测试清理与主分支同步打包任务（核查 tests/unit 冗余项、push main、产出测试 exe）。
+- DONE: 完成模型推理缺包回退修复（确认 `.conda` 依赖不兼容后切换 `.conda311` 打包，并显式收集 basic_pitch/crepe/torchaudio 动态导入依赖，产出 RuntimeFix 测试包）。
+- DONE: 完成模型推理回退二次修复（定位 `torchaudio.load` 与 `torchcodec` 动态库链路问题，改为 `soundfile/librosa` 音频读取并保留 torchaudio functional 计算；runtime-demo `all_ok=true`）。
