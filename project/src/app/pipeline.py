@@ -9,7 +9,7 @@ from typing import Callable
 from src.config.settings import get_settings
 from src.models.entities import ScoreDocument, TranscriptionMode, TranscriptionRequest, to_score_document
 from src.services.audio_ingestion_service import validate_audio_file
-from src.services.export_service import export_to_text
+from src.services.export_service import export_score
 from src.services.transcription_service import transcribe_with_adapters
 
 logger = logging.getLogger(__name__)
@@ -41,9 +41,10 @@ def _emit_progress(
 def run_transcription_pipeline(
     source_path: Path,
     mode: TranscriptionMode = "normal",
+    fmt: str = "txt",
     progress_callback: ProgressCallback | None = None,
 ) -> tuple[ScoreDocument, Path]:
-    """Run minimal end-to-end flow: validate -> transcribe stub -> export."""
+    """Run minimal end-to-end flow: validate -> transcribe -> export by selected format."""
 
     settings = get_settings()
     started_at = perf_counter()
@@ -65,7 +66,7 @@ def run_transcription_pipeline(
     _emit_progress(progress_callback, 80, "progress_generate_score", started_at)
     score = to_score_document(result)
     _emit_progress(progress_callback, 92, "progress_export_file", started_at)
-    output_path = export_to_text(score=score, output_dir=settings.output_dir)
+    output_path = export_score(score=score, output_dir=settings.output_dir, fmt=fmt)
     _emit_progress(progress_callback, 100, "progress_done", started_at)
     logger.info("Pipeline finished. Output: %s", output_path)
     return score, output_path

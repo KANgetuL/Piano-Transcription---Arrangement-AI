@@ -444,9 +444,11 @@ class DesktopApp(tk.Tk):
             self.progress_updates.put((percent, stage, eta_sec))
 
         mode: TranscriptionMode = self.mode_var.get()  # type: ignore[assignment]
+        fmt = self.export_format_var.get().strip().lower() or "txt"
         self.current_future = self.queue_service.submit_transcription(
             Path(source),
             mode,
+            fmt=fmt,
             progress_callback=_on_progress,
         )
         self.after(120, self._poll_future)

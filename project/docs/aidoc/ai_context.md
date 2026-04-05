@@ -476,3 +476,16 @@
 - 结果标记: DONE。
 - 错误类型:
 	- 打包阶段仅出现非阻塞 warning（如 `tbb12.dll` 缺失提示），不影响产物生成。
+
+## 对话关键节点（2026-04-05 - 导出格式修复与重新打包任务）
+- 任务启动时间: 2026-04-05。
+- 核心操作动作:
+	- 按约束仅读取一次 `ai_rules.md`，并完成 aidoc 上下文状态读取。
+	- 排查导出链路后确认根因：`pipeline` 硬编码 `export_to_text`，导致 UI 选择 `mid/musicxml` 仍输出 txt。
+	- 完成修复：`pipeline` 改为按 `fmt` 调用 `export_score`，并将格式参数从 `desktop_ui` 经 `task_queue_service` 透传到 `pipeline`。
+	- CLI 同步支持 `--format` 参数，导出格式与 UI 行为一致。
+	- 创建并执行临时测试文件验证修复，结果通过后删除临时测试文件（遵循规则）。
+	- 在 `.conda311` 执行关联回归测试，结果 `8 passed`。
+- 结果标记: DONE。
+- 错误类型:
+	- 无阻塞错误。

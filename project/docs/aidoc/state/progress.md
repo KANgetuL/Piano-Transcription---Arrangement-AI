@@ -88,3 +88,4 @@
 - DONE: 完成模型推理缺包回退修复（确认 `.conda` 依赖不兼容后切换 `.conda311` 打包，并显式收集 basic_pitch/crepe/torchaudio 动态导入依赖，产出 RuntimeFix 测试包）。
 - DONE: 完成模型推理回退二次修复（定位 `torchaudio.load` 与 `torchcodec` 动态库链路问题，改为 `soundfile/librosa` 音频读取并保留 torchaudio functional 计算；runtime-demo `all_ok=true`）。
 - DONE: 完成本轮主分支同步与 conda311 打包（commit `9a1c142` 已推送 remote main，且测试程序 `PianoTransAI_TempTest_RuntimeFix_20260405_204946.exe` 已生成）。
+- DONE: 完成导出格式修复（修复转谱主流程硬编码 txt 导出，改为按 UI/CLI 选择输出 `txt/mid/musicxml`，关联回归测试 8 passed）。

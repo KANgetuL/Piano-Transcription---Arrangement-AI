@@ -23,6 +23,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run model runtime callability demo without transcription inference",
     )
+    parser.add_argument(
+        "--format",
+        dest="fmt",
+        default="txt",
+        choices=["txt", "mid", "musicxml"],
+        help="Export format for pipeline output",
+    )
     return parser
 
 
@@ -51,7 +58,7 @@ def main() -> int:
     if not args.input:
         parser.error("--input is required unless --runtime-demo is used")
 
-    score, output_path = run_transcription_pipeline(source_path=Path(args.input), mode=args.mode)
+    score, output_path = run_transcription_pipeline(source_path=Path(args.input), mode=args.mode, fmt=args.fmt)
     print(
         json.dumps(
             {

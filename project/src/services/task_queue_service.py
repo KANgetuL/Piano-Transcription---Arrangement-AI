@@ -28,12 +28,21 @@ class TaskQueueService:
         self,
         source_path: Path,
         mode: TranscriptionMode = "normal",
-        pipeline_runner: Callable[[Path, TranscriptionMode], tuple[ScoreDocument, Path]] = run_transcription_pipeline,
+        pipeline_runner: Callable[..., tuple[ScoreDocument, Path]] = run_transcription_pipeline,
+        fmt: str = "txt",
         progress_callback: Callable[[int, str, float | None], None] | None = None,
     ) -> Future[TaskResult]:
         def _run() -> TaskResult:
             signature = inspect.signature(pipeline_runner)
-            if len(signature.parameters) >= 3:
+            params = signature.parameters
+
+            if "fmt" in params and "progress_callback" in params:
+                score, output_path = pipeline_runner(source_path, mode, fmt=fmt, progress_callback=progress_callback)
+            elif "fmt" in params:
+                score, output_path = pipeline_runner(source_path, mode, fmt=fmt)
+            elif "progress_callback" in params:
+                score, output_path = pipeline_runner(source_path, mode, progress_callback=progress_callback)
+            elif len(params) >= 3:
                 score, output_path = pipeline_runner(source_path, mode, progress_callback)
             else:
                 score, output_path = pipeline_runner(source_path, mode)
