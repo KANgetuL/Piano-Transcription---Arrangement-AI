@@ -464,3 +464,15 @@
 - 结果标记: DONE。
 - 错误类型:
 	- `torchcodec` 在 Windows 下动态库加载失败（`libtorchcodec_core*.dll`），通过代码绕开脆弱解码链路后消除阻塞影响。
+
+## 对话关键节点（2026-04-05 - 主分支同步与 conda311 打包任务）
+- 任务启动时间: 2026-04-05。
+- 核心操作动作:
+	- 按约束仅读取一次 `ai_rules.md`，随后完成上下文状态对齐读取。
+	- 在 `main` 分支提交并推送修复代码（commit: `9a1c142`）到远程仓库。
+	- 提交过程中排除模型文件与输出文件，未上传 `models/` 目录内容。
+	- 使用 `.conda311` 环境执行 PyInstaller spec 打包测试程序。
+	- 成功生成 `dist/PianoTransAI_TempTest_RuntimeFix_20260405_204946.exe`。
+- 结果标记: DONE。
+- 错误类型:
+	- 打包阶段仅出现非阻塞 warning（如 `tbb12.dll` 缺失提示），不影响产物生成。
